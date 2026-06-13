@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Bank</title>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, Arial; background: #0c0a09; color: #f5f5f4; }
+    .app { min-height: 100vh; padding: 18px; }
+    .shell { max-width: 1180px; margin: auto; }
+    .hero, .panel, .tabs { border: 1px solid #292524; background: #1c1917; border-radius: 28px; box-shadow: 0 20px 60px #0006; }
+    .hero { padding: 28px; display: flex; justify-content: space-between; gap: 24px; align-items: center; }
+    .eyebrow { color: #fdba74; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; margin: 0 0 12px 0; }
+    h1 { font-size: clamp(30px, 5vw, 52px); line-height: 1; margin: 0; }
+    h2 { margin-top: 0; }
+    .hint { color: #a8a29e; }
+    
+    /* Layout Thống kê mới */
+    .stats-container { display: flex; flex-direction: column; gap: 10px; min-width: 430px; }
+    .stat-full { background: #292524; border-radius: 18px; padding: 14px; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    .stat-full b { font-size: 27px; line-height: 1; }
+    .stat-full span { font-size: 14px; color: #a8a29e; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .stats div { background: #292524; border-radius: 18px; padding: 14px; text-align: center; }
+    .stats b { display: block; font-size: 27px; line-height: 1; margin-bottom: 4px; }
+    .stats span { font-size: 12px; color: #a8a29e; }
+
+    .tabs { margin: 16px 0; padding: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .tabs button, .side button, .form button, .bankItem button, .list-actions button { display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
+    .tabs button { border: 0; border-radius: 18px; background: transparent; color: #d6d3d1; padding: 12px 18px; font-weight: 900; cursor: pointer; }
+    .tabs .active { background: #fb923c; color: #1c1917; }
+    
+    /* Layout phần làm bài */
+    .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+    
+    /* Layout phần ngân hàng câu hỏi */
+    .bank-layout { display: flex; flex-direction: column; gap: 16px; }
+    
+    /* Cột 2 form song song và bằng chiều cao */
+    .form-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+    
+    .panel { padding: 20px; }
+    .side { height: max-content; position: sticky; top: 16px; }
+    .main { min-height: 560px; }
+    label { display: block; margin: 12px 0 7px; font-weight: 800; color: #d6d3d1; }
+    select, input[type="text"], input[type="number"], textarea { width: 100%; border: 1px solid #44403c; background: #0c0a09; color: #f5f5f4; border-radius: 14px; padding: 12px; font: inherit; }
+    
+    /* Dùng Flexbox để các thành phần bên trong form tự động giãn */
+    .form { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+    textarea { min-height: 105px; resize: vertical; }
+    .bulk { flex: 1; resize: none; min-height: 250px; } 
+    
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button { border: 1px solid #44403c; background: #292524; color: #f5f5f4; border-radius: 14px; padding: 11px 13px; font-weight: 900; cursor: pointer; }
+    button:hover { background: #44403c; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .primary { background: #fb923c!important; color: #1c1917!important; border-color: #fb923c!important; }
+    .warn { background: #78350f!important; border-color: #f59e0b!important; }
+    .danger { background: #4c0519!important; border-color: #fb7185!important; color: #fecdd3!important; }
+    .danger:hover { background: #881337!important; }
+    .side > button { width: 100%; margin-top: 8px; }
+    .gridBtns { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-top: 14px; }
+    .gridBtns button { padding: 9px 0; font-size: 13px; }
+    .now { outline: 2px solid #fdba74; }
+    .picked { border-color: #fb923c!important; background: #431407!important; }
+    .good, .correct { border-color: #34d399!important; background: #064e3b!important; }
+    .bad, .wrong { border-color: #fb7185!important; background: #4c0519!important; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .chips span { background: #292524; border-radius: 999px; padding: 7px 12px; font-weight: 900; color: #fed7aa; }
+    .main h2 { font-size: clamp(22px, 3vw, 34px); line-height: 1.25; }
+    .options { display: grid; gap: 12px; margin-top: 24px; }
+    .options button { text-align: left; padding: 17px; font-size: 16px; justify-content: flex-start; }
+    .options b { color: #fdba74; margin-right: 8px; }
+    .explain { margin-top: 22px; border-radius: 20px; padding: 18px; border: 1px solid; }
+    .explain.ok { border-color: #34d399; background: #064e3b99; }
+    .explain.no { border-color: #fb7185; background: #4c051999; }
+    
+    .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .list-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .bankList { display: grid; gap: 10px; max-height: 500px; overflow: auto; padding-right: 4px; }
+    .bankItem { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; border: 1px solid #292524; background: #0c0a09; border-radius: 16px; padding: 16px; transition: 0.2s; }
+    .bankItem.selected { border-color: #fb923c; background: #1a100c; }
+    .bankItem-content { flex: 1; }
+    .bankItem p { margin: 6px 0 0; color: #a8a29e; font-size: 14px; }
+    input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #fb923c; margin-top: 4px; }
+    .history { display: grid; gap: 12px; }
+    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;}
+    .history article { display: flex; justify-content: space-between; align-items: center; border: 1px solid #292524; background: #0c0a09; border-radius: 18px; padding: 16px; }
+    .history-info p { margin: 6px 0 0; color: #a8a29e; }
+    .empty { text-align: center; color: #a8a29e; padding: 80px 0; }
+    
+    @media(max-width:850px){
+      .hero { display: block; }
+      .stats-container { min-width: 0; margin-top: 18px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .layout, .form-col { grid-template-columns: 1fr; }
+      .side { position: static; }
+      .app { padding: 10px; }
+      .bulk { min-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+
+    const Icon = ({ name, size = 18 }) => {
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+      return <i data-lucide={name.toLowerCase()} style={{ width: size, height: size, display: 'inline-block' }}></i>;
+    };
+
+    const LETTERS = ['A', 'B', 'C', 'D'];
+    const STORAGE_KEYS = {
+      questions: 'quiz_bank_questions_v2',
+      attempts: 'quiz_bank_attempts_v2',
+      examIds: 'quiz_bank_exam_ids_v2'
+    };
+
+    const SAMPLE_QUESTIONS = [
+      {
+        id: crypto.randomUUID(),
+        q: 'Vấn đề cơ bản của triết học theo Ph. Ăngghen là quan hệ nào?',
+        options: ['Quan hệ giữa tư duy và tồn tại', 'Quan hệ giữa tồn tại và thực tiễn', 'Quan hệ giữa tư duy và nhận thức', 'Quan hệ giữa thực tiễn và chân lý'],
+        answer: 0, explain: 'Vấn đề cơ bản của triết học là quan hệ giữa tư duy và tồn tại.'
+      },
+      {
+        id: crypto.randomUUID(),
+        q: 'Cụm từ nào là hạt nhân trong định nghĩa vật chất của Lênin?',
+        options: ['Thực tại khách quan', 'Cảm giác chủ quan', 'Ý niệm tuyệt đối', 'Tinh thần khách quan'],
+        answer: 0, explain: 'Thực tại khách quan là thuộc tính cơ bản nhất của vật chất.'
+      }
+    ];
+
+    function load(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; }
+    }
+    function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+    
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function parseBulk(text) {
+      const blocks = text.split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean);
+      const parsed = [];
+
+      for (const block of blocks) {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        let q = '';
+        const options = [];
+        let answerLetter = '';
+        let explain = '';
+
+        for (const line of lines) {
+          const clean = line.replace(/^\d+[).:-]?\s*/, '').trim();
+          if (/^(câu hỏi|question)\s*:/i.test(line)) q = line.split(':').slice(1).join(':').trim();
+          else if (/^[A-D][).:-]\s*/i.test(line)) options.push(line.replace(/^[A-D][).:-]\s*/i, '').trim());
+          else if (/^(đáp án|answer)\s*:/i.test(line)) answerLetter = (line.split(':').slice(1).join(':').trim()[0] || '').toUpperCase();
+          else if (/^(giải thích|explain|explanation)\s*:/i.test(line)) explain = line.split(':').slice(1).join(':').trim();
+          else if (!q && clean.length > 8) q = clean;
+        }
+
+        if (q && options.length >= 2) {
+          while (options.length < 4) options.push('Chưa nhập đáp án');
+          const answer = Math.max(0, LETTERS.indexOf(answerLetter));
+          parsed.push({ id: crypto.randomUUID(), q, options: options.slice(0, 4), answer, explain });
+        }
+      }
+      return parsed;
+    }
+
+    function App() {
+      const [questions, setQuestions] = useState(() => load(STORAGE_KEYS.questions, SAMPLE_QUESTIONS));
+      const [attempts, setAttempts] = useState(() => load(STORAGE_KEYS.attempts, []));
+      
+      const [examQuestionIds, setExamQuestionIds] = useState(() => load(STORAGE_KEYS.examIds, null));
+      const [randomCount, setRandomCount] = useState(10);
+      
+      const [mode, setMode] = useState('exam');
+      const [answers, setAnswers] = useState({});
+      const [flags, setFlags] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+      const [current, setCurrent] = useState(0);
+      const [wrongOnly, setWrongOnly] = useState(false);
+      
+      const [bulk, setBulk] = useState('');
+      const [form, setForm] = useState({ q: '', A: '', B: '', C: '', D: '', answer: 'A', explain: '' });
+      const [selectedIds, setSelectedIds] = useState(new Set());
+
+      const activeQuestions = useMemo(() => {
+        if (!examQuestionIds) return questions;
+        return examQuestionIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+      }, [examQuestionIds, questions]);
+
+      const filtered = useMemo(() => activeQuestions.map((_, i) => i).filter(i => {
+        const q = activeQuestions[i];
+        const okWrong = !wrongOnly || (submitted && answers[i] !== q.answer);
+        return okWrong;
+      }), [activeQuestions, wrongOnly, submitted, answers]);
+
+      const pos = Math.min(current, Math.max(filtered.length - 1, 0));
+      const index = filtered[pos] ?? 0;
+      const item = activeQuestions[index];
+      const answeredCount = Object.keys(answers).length;
+      const score = activeQuestions.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
+      const examTotal = activeQuestions.length;
+
+      function persistQuestions(next) { setQuestions(next); save(STORAGE_KEYS.questions, next); }
+      function persistAttempts(next) { setAttempts(next); save(STORAGE_KEYS.attempts, next); }
+      
+      function resetExam() { setAnswers({}); setFlags({}); setSubmitted(false); setCurrent(0); setWrongOnly(false); }
+      
+      function shuffleCurrentExam() {
+        const ids = shuffle(activeQuestions).map(q => q.id);
+        setExamQuestionIds(ids);
+        save(STORAGE_KEYS.examIds, ids);
+        resetExam();
+      }
+
+      function generateRandomExam(n) {
+        if (questions.length === 0) return alert('Ngân hàng chưa có câu hỏi nào!');
+        const validN = Math.min(Math.max(1, n), questions.length);
+        const ids = shuffle(questions).slice(0, validN).map(q => q.id);
+        setExamQuestionIds(ids);
+        save(STORAGE_KEYS.examIds, ids);
+        resetExam();
+        alert(`Đã tạo thành công đề thi ${validN} câu ngẫu nhiên!`);
+      }
+
+      function useAllQuestions() {
+        setExamQuestionIds(null);
+        save(STORAGE_KEYS.examIds, null);
+        resetExam();
+      }
+
+      function submitExam() {
+        setSubmitted(true);
+        const attempt = {
+          id: crypto.randomUUID(), date: new Date().toLocaleString('vi-VN'),
+          score, total: examTotal, point10: (score / Math.max(examTotal, 1) * 10).toFixed(2),
+          answers, flags
+        };
+        persistAttempts([attempt, ...attempts].slice(0, 30));
+      }
+
+      function addQuestion(e) {
+        e.preventDefault();
+        const next = [...questions, {
+          id: crypto.randomUUID(), q: form.q,
+          options: [form.A, form.B, form.C, form.D], answer: LETTERS.indexOf(form.answer), explain: form.explain
+        }];
+        persistQuestions(next);
+        setForm({ q: '', A: '', B: '', C: '', D: '', answer: 'A', explain: '' });
+      }
+
+      function addBulk() {
+        const parsed = parseBulk(bulk);
+        if (!parsed.length) return alert('Chưa tách được câu hỏi. Hãy dùng đúng định dạng để web có thể nhận diện.');
+        persistQuestions([...questions, ...parsed]);
+        setBulk('');
+        alert(`Đã thêm ${parsed.length} câu hỏi.`);
+      }
+
+      function toggleSelect(id) {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setSelectedIds(next);
+      }
+
+      function toggleSelectAll() {
+        if (selectedIds.size === questions.length) {
+          setSelectedIds(new Set());
+        } else {
+          setSelectedIds(new Set(questions.map(q => q.id)));
+        }
+      }
+
+      function deleteSelected() {
+        if (!selectedIds.size) return;
+        if (!confirm(`Xóa ${selectedIds.size} câu hỏi đã chọn?`)) return;
+        persistQuestions(questions.filter(q => !selectedIds.has(q.id)));
+        setSelectedIds(new Set());
+        resetExam();
+      }
+
+      function deleteAllQuestions() {
+        if (!questions.length) return;
+        if (!confirm('CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ câu hỏi trong ngân hàng?')) return;
+        persistQuestions([]);
+        setSelectedIds(new Set());
+        resetExam();
+      }
+
+      function deleteAttempt(id) {
+        if (!confirm('Xóa kết quả bài thi này?')) return;
+        persistAttempts(attempts.filter(a => a.id !== id));
+      }
+
+      function deleteAllAttempts() {
+        if (!attempts.length) return;
+        if (!confirm('Xóa TẤT CẢ lịch sử bài làm?')) return;
+        persistAttempts([]);
+      }
+
+      return (
+        <div className="app">
+          <div className="shell">
+            <header className="hero">
+              <div>
+                <p className="eyebrow">QUIZ BANK - CILLTECH</p>
+                <h1>Website luyện trắc nghiệm</h1>
+              </div>
+              <div className="stats-container">
+                <div className="stat-full">
+                  <b>{questions.length}</b> <span>câu trong ngân hàng đề</span>
+                </div>
+                <div className="stats">
+                  <div><b>{activeQuestions.length}</b><span>câu hỏi</span></div>
+                  <div><b>{answeredCount}</b><span>đã chọn</span></div>
+                  <div><b>{submitted ? score : '—'}</b><span>câu đúng</span></div>
+                  <div><b>{submitted ? (score / Math.max(examTotal, 1) * 10).toFixed(2) : '—'}</b><span>điểm 10</span></div>
+                </div>
+              </div>
+            </header>
+
+            <nav className="tabs">
+              <button className={mode === 'exam' ? 'active' : ''} onClick={() => setMode('exam')}><Icon name="book-open"/> Làm bài</button>
+              <button className={mode === 'bank' ? 'active' : ''} onClick={() => setMode('bank')}><Icon name="database"/> Ngân hàng câu hỏi</button>
+              <button className={mode === 'history' ? 'active' : ''} onClick={() => setMode('history')}><Icon name="history"/> Lịch sử thi</button>
+            </nav>
+
+            {mode === 'exam' && (
+              <section className="layout">
+                <aside className="panel side">
+                  <div className="two">
+                    <button onClick={() => setCurrent(c => Math.max(0, c - 1))}>Trước</button>
+                    <button onClick={() => setCurrent(c => Math.min(filtered.length - 1, c + 1))}>Sau</button>
+                  </div>
+                  <button disabled={!item} onClick={() => setFlags(f => ({...f, [index]: !f[index]}))} className={flags[index] ? 'warn' : ''}>
+                    <Icon name="flag" size={17}/> {flags[index] ? 'Đã cắm cờ' : 'Cắm cờ câu này'}
+                  </button>
+                  <button disabled={!submitted} onClick={() => { setWrongOnly(v => !v); setCurrent(0); }}>{wrongOnly ? 'Hiện tất cả' : 'Chỉ xem câu sai'}</button>
+                  <button onClick={submitExam} disabled={submitted || activeQuestions.length === 0} className="primary"><Icon name="check-circle-2" size={17}/> Nộp & lưu bài</button>
+                  <button onClick={resetExam}><Icon name="rotate-ccw" size={17}/> Làm lại bài này</button>
+                  <button onClick={shuffleCurrentExam}>Trộn thứ tự đề</button>
+
+                  <hr style={{ border: 0, borderTop: '1px solid #44403c', margin: '18px 0' }} />
+                  
+                  <label style={{ marginTop: 0, textAlign: 'center' }}>Tạo đề từ ngân hàng</label>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input type="number" min="1" max={questions.length} value={randomCount} onChange={e => setRandomCount(e.target.value)} style={{ width: '80px', padding: '11px' }} />
+                    <button onClick={() => generateRandomExam(Number(randomCount))} className="primary" style={{ flex: 1 }}>Ngẫu nhiên</button>
+                  </div>
+                  <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu</button>
+
+                  <div className="gridBtns">
+                    {filtered.map((idx, p) => {
+                      const picked = answers[idx] !== undefined;
+                      const good = submitted && answers[idx] === activeQuestions[idx].answer;
+                      const bad = submitted && answers[idx] !== undefined && answers[idx] !== activeQuestions[idx].answer;
+                      return (
+                        <button key={idx} onClick={() => setCurrent(p)} className={`${idx === index ? 'now' : ''} ${good ? 'good' : bad ? 'bad' : picked ? 'picked' : ''}`}>
+                          {flags[idx] ? '🚩' : idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </aside>
+
+                <main className="panel main">
+                  {!item ? <div className="empty">Không có câu hỏi trong đề. Hãy thêm câu hỏi vào ngân hàng.</div> : (
+                    <>
+                      <div className="chips"><span>Câu {index + 1}/{activeQuestions.length}</span>{flags[index] && <span>🚩 Chưa chắc chắn</span>}</div>
+                      <h2>{item.q}</h2>
+                      <div className="options">
+                        {item.options.map((op, i) => {
+                          const picked = answers[index] === i;
+                          const correct = submitted && i === item.answer;
+                          const wrong = submitted && picked && i !== item.answer;
+                          return (
+                            <button key={i} onClick={() => !submitted && setAnswers(a => ({...a, [index]: i}))} className={`${picked ? 'picked' : ''} ${correct ? 'correct' : ''} ${wrong ? 'wrong' : ''}`}>
+                              <b>{LETTERS[i]}.</b> {op}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {submitted && (
+                        <div className={answers[index] === item.answer ? 'explain ok' : 'explain no'}>
+                          <b>{answers[index] === item.answer ? 'Đúng ✅' : `Sai · Đáp án đúng: ${LETTERS[item.answer]} ✅`}</b>
+                          <p>{item.explain || 'Chưa có giải thích.'}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </main>
+              </section>
+            )}
+
+            {mode === 'bank' && (
+              <section className="bank-layout">
+                <div className="form-col">
+                  <form className="panel form" onSubmit={addQuestion}>
+                    <h2>Thêm 1 câu hỏi</h2>
+                    <textarea required placeholder="Nội dung câu hỏi" value={form.q} onChange={e => setForm({...form, q: e.target.value})}/>
+                    {LETTERS.map(l => <input type="text" key={l} required placeholder={`Đáp án ${l}`} value={form[l]} onChange={e => setForm({...form, [l]: e.target.value})}/>) }
+                    <select value={form.answer} onChange={e => setForm({...form, answer: e.target.value})}>
+                      {LETTERS.map(l => <option key={l} value={l}>Đáp án đúng: {l}</option>)}
+                    </select>
+                    <textarea placeholder="Giải thích đáp án (không bắt buộc)" value={form.explain} onChange={e => setForm({...form, explain: e.target.value})}/>
+                    <button className="primary"><Icon name="plus" size={17}/> Thêm vào ngân hàng</button>
+                  </form>
+
+                  <div className="panel form">
+                    <h2>Thêm hàng loạt</h2>
+                    <textarea className="bulk" value={bulk} onChange={e => setBulk(e.target.value)} placeholder={`Mỗi câu cách nhau 1 dòng trống. Web sẽ tự nhận diện đáp án.\n\nCâu hỏi: Nội dung câu hỏi?\nA. Đáp án A\nB. Đáp án B\nC. Đáp án C\nD. Đáp án D\nĐáp án: A\nGiải thích: ...\n\nCâu hỏi: ...`}/>
+                    <button onClick={addBulk} className="primary"><Icon name="upload" size={17}/> Tách và thêm hàng loạt</button>
+                  </div>
+                </div>
+
+                <div className="panel">
+                  <div className="list-header">
+                    <h2>Danh sách ({questions.length})</h2>
+                    <div className="list-actions">
+                      <button onClick={toggleSelectAll}>
+                        <Icon name={selectedIds.size === questions.length && questions.length > 0 ? "check-square" : "square"} size={16}/>
+                        Chọn tất cả
+                      </button>
+                      <button onClick={deleteSelected} disabled={selectedIds.size === 0} className="warn">
+                        <Icon name="trash" size={16}/> Xóa ({selectedIds.size})
+                      </button>
+                      <button onClick={deleteAllQuestions} disabled={questions.length === 0} className="danger">
+                        <Icon name="trash-2" size={16}/> Xóa hết
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {questions.length === 0 ? (
+                    <div className="empty">Ngân hàng trống.</div>
+                  ) : (
+                    <div className="bankList">
+                      {questions.map((q, i) => (
+                        <div className={`bankItem ${selectedIds.has(q.id) ? 'selected' : ''}`} key={q.id}>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedIds.has(q.id)} 
+                            onChange={() => toggleSelect(q.id)} 
+                          />
+                          <div className="bankItem-content">
+                            <b>{i + 1}. {q.q}</b>
+                            <p>Đáp án: {LETTERS[q.answer]}</p>
+                          </div>
+                          <button onClick={() => {
+                             if(confirm('Xóa câu hỏi này?')) persistQuestions(questions.filter(item => item.id !== q.id));
+                          }}><Icon name="x" size={16}/></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {mode === 'history' && (
+              <section className="panel">
+                <div className="history-header">
+                  <h2>Bài thi đã lưu</h2>
+                  <button onClick={deleteAllAttempts} disabled={attempts.length === 0} className="danger">
+                    <Icon name="trash-2" size={16}/> Xóa toàn bộ lịch sử
+                  </button>
+                </div>
+                {!attempts.length && <p className="hint empty">Chưa có bài nào. Khi bấm “Nộp & lưu bài”, kết quả sẽ nằm ở đây.</p>}
+                <div className="history">
+                  {attempts.map(a => (
+                    <article key={a.id}>
+                      <div className="history-info">
+                        <b>{a.date}</b>
+                        <p>Điểm: {a.score}/{a.total} · {a.point10}/10 · Cắm cờ: {Object.values(a.flags || {}).filter(Boolean).length} câu</p>
+                      </div>
+                      <button onClick={() => deleteAttempt(a.id)} className="warn"><Icon name="trash" size={16}/></button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
