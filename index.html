@@ -135,7 +135,8 @@
       questions: 'quiz_bank_questions_v2',
       attempts: 'quiz_bank_attempts_v2',
       examIds: 'quiz_bank_exam_ids_v2',
-      instantMode: 'quiz_bank_instant_mode' // Key mới lưu chế độ
+      instantMode: 'quiz_bank_instant_mode',         // Nút gạt điều kiện
+      activeInstantMode: 'quiz_bank_active_mode'     // Chế độ đang chạy của đề thi
     };
 
     const SAMPLE_QUESTIONS = [
@@ -202,7 +203,9 @@
       
       const [examQuestionIds, setExamQuestionIds] = useState(() => load(STORAGE_KEYS.examIds, null));
       const [randomCount, setRandomCount] = useState(10);
-      const [instantMode, setInstantMode] = useState(() => load(STORAGE_KEYS.instantMode, false)); // State cho Toggle Mode
+      
+      const [instantMode, setInstantMode] = useState(() => load(STORAGE_KEYS.instantMode, false)); // Nút gạt Setting
+      const [activeInstantMode, setActiveInstantMode] = useState(() => load(STORAGE_KEYS.activeInstantMode, false)); // Chế độ của đề hiện tại
       
       const [mode, setMode] = useState('exam');
       const [answers, setAnswers] = useState({});
@@ -223,10 +226,11 @@
       const filtered = useMemo(() => activeQuestions.map((_, i) => i).filter(i => {
         const q = activeQuestions[i];
         const isAnswered = answers[i] !== undefined;
-        const showResult = submitted || (instantMode && isAnswered);
+        // Dùng activeInstantMode thay vì instantMode
+        const showResult = submitted || (activeInstantMode && isAnswered);
         const okWrong = !wrongOnly || (showResult && answers[i] !== q.answer);
         return okWrong;
-      }), [activeQuestions, wrongOnly, submitted, answers, instantMode]);
+      }), [activeQuestions, wrongOnly, submitted, answers, activeInstantMode]);
 
       const pos = Math.min(current, Math.max(filtered.length - 1, 0));
       const index = filtered[pos] ?? 0;
@@ -235,9 +239,9 @@
       const score = activeQuestions.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
       const examTotal = activeQuestions.length;
 
-      // Check trạng thái hiển thị của câu hiện tại
+      // Check trạng thái hiển thị của câu hiện tại dựa trên ActiveMode
       const hasAnsweredCurrent = answers[index] !== undefined;
-      const showCurrentResult = submitted || (instantMode && hasAnsweredCurrent);
+      const showCurrentResult = submitted || (activeInstantMode && hasAnsweredCurrent);
 
       function persistQuestions(next) { setQuestions(next); save(STORAGE_KEYS.questions, next); }
       function persistAttempts(next) { setAttempts(next); save(STORAGE_KEYS.attempts, next); }
@@ -257,6 +261,11 @@
         const ids = shuffle(questions).slice(0, validN).map(q => q.id);
         setExamQuestionIds(ids);
         save(STORAGE_KEYS.examIds, ids);
+        
+        // Cập nhật chế độ thi từ nút gạt Setting
+        setActiveInstantMode(instantMode);
+        save(STORAGE_KEYS.activeInstantMode, instantMode);
+        
         resetExam();
         alert(`Đã tạo thành công đề thi ${validN} câu ngẫu nhiên!`);
       }
@@ -264,6 +273,11 @@
       function useAllQuestions() {
         setExamQuestionIds(null);
         save(STORAGE_KEYS.examIds, null);
+        
+        // Auto bật Hiện đáp án ngay khi "Làm toàn bộ"
+        setActiveInstantMode(true);
+        save(STORAGE_KEYS.activeInstantMode, true);
+        
         resetExam();
       }
 
@@ -373,7 +387,7 @@
                   <button disabled={!item} onClick={() => setFlags(f => ({...f, [index]: !f[index]}))} className={flags[index] ? 'warn' : ''}>
                     <Icon name="flag" size={17}/> {flags[index] ? 'Đã cắm cờ' : 'Cắm cờ câu này'}
                   </button>
-                  <button disabled={!submitted && !instantMode} onClick={() => { setWrongOnly(v => !v); setCurrent(0); }}>
+                  <button disabled={!submitted && !activeInstantMode} onClick={() => { setWrongOnly(v => !v); setCurrent(0); }}>
                     {wrongOnly ? 'Hiện tất cả' : 'Chỉ xem câu sai'}
                   </button>
                   <button onClick={submitExam} disabled={submitted || activeQuestions.length === 0} className="primary"><Icon name="check-circle-2" size={17}/> Nộp & lưu bài</button>
@@ -382,9 +396,9 @@
 
                   <hr style={{ border: 0, borderTop: '1px solid #44403c', margin: '18px 0' }} />
                   
-                  <label style={{ marginTop: 0, textAlign: 'center' }}>Chế độ & Tạo đề</label>
+                  <label style={{ marginTop: 0, textAlign: 'center' }}>Tạo đề ngẫu nhiên</label>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
-                    <label className="switch" title="Bật/Tắt chế độ hiện đáp án ngay">
+                    <label className="switch" title="Chế độ khi tạo đề ngẫu nhiên">
                       <input type="checkbox" checked={instantMode} onChange={e => {
                         setInstantMode(e.target.checked);
                         save(STORAGE_KEYS.instantMode, e.target.checked);
@@ -395,15 +409,19 @@
                     <button onClick={() => generateRandomExam(Number(randomCount))} className="primary" style={{ flex: 1 }}>Ngẫu nhiên</button>
                   </div>
                   <div style={{ fontSize: '12px', color: '#a8a29e', textAlign: 'center', marginBottom: '12px' }}>
-                    {instantMode ? 'Chế độ: Hiện đáp án ngay khi chọn' : 'Chế độ: Nộp bài mới hiện đáp án'}
+                    Tạo mới sẽ: <b>{instantMode ? 'Hiện đáp án ngay' : 'Nộp mới hiện đáp án'}</b>
                   </div>
+                  
+                  <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu (Auto Hiện ngay)</button>
 
-                  <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu</button>
+                  <div style={{ textAlign: 'center', marginTop: '16px', color: '#fdba74', fontWeight: 800, fontSize: '13px' }}>
+                    ĐANG LÀM BÀI: {activeInstantMode ? 'HIỆN ĐÁP ÁN NGAY' : 'NỘP MỚI HIỆN ĐÁP ÁN'}
+                  </div>
 
                   <div className="gridBtns">
                     {filtered.map((idx, p) => {
                       const picked = answers[idx] !== undefined;
-                      const showResultForThis = submitted || (instantMode && picked);
+                      const showResultForThis = submitted || (activeInstantMode && picked);
                       const good = showResultForThis && answers[idx] === activeQuestions[idx].answer;
                       const bad = showResultForThis && answers[idx] !== activeQuestions[idx].answer;
                       
@@ -429,8 +447,8 @@
                           return (
                             <button key={i} 
                               onClick={() => {
-                                // Khóa không cho sửa đáp án nếu đã Submit HOẶC đang bật InstantMode và đã chọn rồi
-                                if (!submitted && !(instantMode && hasAnsweredCurrent)) {
+                                // Khóa câu trả lời nếu đã Nộp bài HOẶC đang bật activeInstantMode và đã chọn rồi
+                                if (!submitted && !(activeInstantMode && hasAnsweredCurrent)) {
                                   setAnswers(a => ({...a, [index]: i}))
                                 }
                               }} 
