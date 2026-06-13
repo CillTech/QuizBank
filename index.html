@@ -52,6 +52,14 @@
     label { display: block; margin: 12px 0 7px; font-weight: 800; color: #d6d3d1; }
     select, input[type="text"], input[type="number"], textarea { width: 100%; border: 1px solid #44403c; background: #0c0a09; color: #f5f5f4; border-radius: 14px; padding: 12px; font: inherit; }
     
+    /* CSS cho Nút gạt (Toggle Switch) */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #44403c; transition: .2s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: #f5f5f4; transition: .2s; border-radius: 50%; }
+    input:checked + .slider { background-color: #fb923c; }
+    input:checked + .slider:before { transform: translateX(20px); }
+
     /* Dùng Flexbox để các thành phần bên trong form tự động giãn */
     .form { display: flex; flex-direction: column; gap: 12px; height: 100%; }
     textarea { min-height: 105px; resize: vertical; }
@@ -126,7 +134,8 @@
     const STORAGE_KEYS = {
       questions: 'quiz_bank_questions_v2',
       attempts: 'quiz_bank_attempts_v2',
-      examIds: 'quiz_bank_exam_ids_v2'
+      examIds: 'quiz_bank_exam_ids_v2',
+      instantMode: 'quiz_bank_instant_mode' // Key mới lưu chế độ
     };
 
     const SAMPLE_QUESTIONS = [
@@ -145,7 +154,7 @@
     ];
 
     function load(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; }
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
     }
     function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
     
@@ -193,6 +202,7 @@
       
       const [examQuestionIds, setExamQuestionIds] = useState(() => load(STORAGE_KEYS.examIds, null));
       const [randomCount, setRandomCount] = useState(10);
+      const [instantMode, setInstantMode] = useState(() => load(STORAGE_KEYS.instantMode, false)); // State cho Toggle Mode
       
       const [mode, setMode] = useState('exam');
       const [answers, setAnswers] = useState({});
@@ -212,9 +222,11 @@
 
       const filtered = useMemo(() => activeQuestions.map((_, i) => i).filter(i => {
         const q = activeQuestions[i];
-        const okWrong = !wrongOnly || (submitted && answers[i] !== q.answer);
+        const isAnswered = answers[i] !== undefined;
+        const showResult = submitted || (instantMode && isAnswered);
+        const okWrong = !wrongOnly || (showResult && answers[i] !== q.answer);
         return okWrong;
-      }), [activeQuestions, wrongOnly, submitted, answers]);
+      }), [activeQuestions, wrongOnly, submitted, answers, instantMode]);
 
       const pos = Math.min(current, Math.max(filtered.length - 1, 0));
       const index = filtered[pos] ?? 0;
@@ -222,6 +234,10 @@
       const answeredCount = Object.keys(answers).length;
       const score = activeQuestions.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
       const examTotal = activeQuestions.length;
+
+      // Check trạng thái hiển thị của câu hiện tại
+      const hasAnsweredCurrent = answers[index] !== undefined;
+      const showCurrentResult = submitted || (instantMode && hasAnsweredCurrent);
 
       function persistQuestions(next) { setQuestions(next); save(STORAGE_KEYS.questions, next); }
       function persistAttempts(next) { setAttempts(next); save(STORAGE_KEYS.attempts, next); }
@@ -357,25 +373,40 @@
                   <button disabled={!item} onClick={() => setFlags(f => ({...f, [index]: !f[index]}))} className={flags[index] ? 'warn' : ''}>
                     <Icon name="flag" size={17}/> {flags[index] ? 'Đã cắm cờ' : 'Cắm cờ câu này'}
                   </button>
-                  <button disabled={!submitted} onClick={() => { setWrongOnly(v => !v); setCurrent(0); }}>{wrongOnly ? 'Hiện tất cả' : 'Chỉ xem câu sai'}</button>
+                  <button disabled={!submitted && !instantMode} onClick={() => { setWrongOnly(v => !v); setCurrent(0); }}>
+                    {wrongOnly ? 'Hiện tất cả' : 'Chỉ xem câu sai'}
+                  </button>
                   <button onClick={submitExam} disabled={submitted || activeQuestions.length === 0} className="primary"><Icon name="check-circle-2" size={17}/> Nộp & lưu bài</button>
                   <button onClick={resetExam}><Icon name="rotate-ccw" size={17}/> Làm lại bài này</button>
                   <button onClick={shuffleCurrentExam}>Trộn thứ tự đề</button>
 
                   <hr style={{ border: 0, borderTop: '1px solid #44403c', margin: '18px 0' }} />
                   
-                  <label style={{ marginTop: 0, textAlign: 'center' }}>Tạo đề từ ngân hàng</label>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <label style={{ marginTop: 0, textAlign: 'center' }}>Chế độ & Tạo đề</label>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+                    <label className="switch" title="Bật/Tắt chế độ hiện đáp án ngay">
+                      <input type="checkbox" checked={instantMode} onChange={e => {
+                        setInstantMode(e.target.checked);
+                        save(STORAGE_KEYS.instantMode, e.target.checked);
+                      }} />
+                      <span className="slider"></span>
+                    </label>
                     <input type="number" min="1" max={questions.length} value={randomCount} onChange={e => setRandomCount(e.target.value)} style={{ width: '80px', padding: '11px' }} />
                     <button onClick={() => generateRandomExam(Number(randomCount))} className="primary" style={{ flex: 1 }}>Ngẫu nhiên</button>
                   </div>
+                  <div style={{ fontSize: '12px', color: '#a8a29e', textAlign: 'center', marginBottom: '12px' }}>
+                    {instantMode ? 'Chế độ: Hiện đáp án ngay khi chọn' : 'Chế độ: Nộp bài mới hiện đáp án'}
+                  </div>
+
                   <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu</button>
 
                   <div className="gridBtns">
                     {filtered.map((idx, p) => {
                       const picked = answers[idx] !== undefined;
-                      const good = submitted && answers[idx] === activeQuestions[idx].answer;
-                      const bad = submitted && answers[idx] !== undefined && answers[idx] !== activeQuestions[idx].answer;
+                      const showResultForThis = submitted || (instantMode && picked);
+                      const good = showResultForThis && answers[idx] === activeQuestions[idx].answer;
+                      const bad = showResultForThis && answers[idx] !== activeQuestions[idx].answer;
+                      
                       return (
                         <button key={idx} onClick={() => setCurrent(p)} className={`${idx === index ? 'now' : ''} ${good ? 'good' : bad ? 'bad' : picked ? 'picked' : ''}`}>
                           {flags[idx] ? '🚩' : idx + 1}
@@ -393,16 +424,23 @@
                       <div className="options">
                         {item.options.map((op, i) => {
                           const picked = answers[index] === i;
-                          const correct = submitted && i === item.answer;
-                          const wrong = submitted && picked && i !== item.answer;
+                          const correct = showCurrentResult && i === item.answer;
+                          const wrong = showCurrentResult && picked && i !== item.answer;
                           return (
-                            <button key={i} onClick={() => !submitted && setAnswers(a => ({...a, [index]: i}))} className={`${picked ? 'picked' : ''} ${correct ? 'correct' : ''} ${wrong ? 'wrong' : ''}`}>
+                            <button key={i} 
+                              onClick={() => {
+                                // Khóa không cho sửa đáp án nếu đã Submit HOẶC đang bật InstantMode và đã chọn rồi
+                                if (!submitted && !(instantMode && hasAnsweredCurrent)) {
+                                  setAnswers(a => ({...a, [index]: i}))
+                                }
+                              }} 
+                              className={`${picked ? 'picked' : ''} ${correct ? 'correct' : ''} ${wrong ? 'wrong' : ''}`}>
                               <b>{LETTERS[i]}.</b> {op}
                             </button>
                           );
                         })}
                       </div>
-                      {submitted && (
+                      {showCurrentResult && (
                         <div className={answers[index] === item.answer ? 'explain ok' : 'explain no'}>
                           <b>{answers[index] === item.answer ? 'Đúng ✅' : `Sai · Đáp án đúng: ${LETTERS[item.answer]} ✅`}</b>
                           <p>{item.explain || 'Chưa có giải thích.'}</p>
