@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiz Bank</title>
   
+  <!-- Nhúng font Be Vietnam Pro tối ưu cho tiếng Việt -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -17,7 +18,6 @@
   <style>
     * { box-sizing: border-box; }
     
-    /* Cập nhật font chữ sang Be Vietnam Pro toàn cục */
     body { margin: 0; font-family: 'Be Vietnam Pro', system-ui, Arial, sans-serif; background: #0c0a09; color: #f5f5f4; }
     button, input, select, textarea { font-family: inherit; } 
     
@@ -30,7 +30,6 @@
     h2 { margin-top: 0; }
     .hint { color: #a8a29e; }
     
-    /* Layout Thống kê */
     .stats-container { display: flex; flex-direction: column; gap: 10px; min-width: 430px; }
     .stat-full { background: #292524; border-radius: 18px; padding: 14px; display: flex; justify-content: center; align-items: center; gap: 8px; }
     .stat-full b { font-size: 27px; line-height: 1; }
@@ -45,13 +44,8 @@
     .tabs button { border: 0; border-radius: 18px; background: transparent; color: #d6d3d1; padding: 12px 18px; font-weight: 900; cursor: pointer; }
     .tabs .active { background: #fb923c; color: #1c1917; }
     
-    /* Layout phần làm bài */
     .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
-    
-    /* Layout phần ngân hàng câu hỏi */
     .bank-layout { display: flex; flex-direction: column; gap: 16px; }
-    
-    /* Cột 2 form song song và bằng chiều cao */
     .form-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
     
     .panel { padding: 20px; }
@@ -60,7 +54,6 @@
     label { display: block; margin: 12px 0 7px; font-weight: 800; color: #d6d3d1; }
     select, input[type="text"], input[type="number"], textarea { width: 100%; border: 1px solid #44403c; background: #0c0a09; color: #f5f5f4; border-radius: 14px; padding: 12px; font-size: 15px; }
     
-    /* CSS cho Nút gạt (Toggle Switch) */
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #44403c; transition: .2s; border-radius: 24px; }
@@ -110,6 +103,11 @@
     .history article { display: flex; justify-content: space-between; align-items: center; border: 1px solid #292524; background: #0c0a09; border-radius: 18px; padding: 16px; }
     .history-info p { margin: 6px 0 0; color: #a8a29e; }
     .empty { text-align: center; color: #a8a29e; padding: 80px 0; }
+    
+    /* CSS cho Modal Export */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; backdrop-filter: blur(4px); }
+    .modal-content { background: #1c1917; border: 1px solid #44403c; border-radius: 20px; padding: 24px; width: 100%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px #0009; }
+    .modal-content textarea { flex: 1; min-height: 400px; font-family: monospace; font-size: 14px; white-space: pre-wrap; background: #0c0a09; border-radius: 12px; }
     
     @media(max-width:850px){
       .hero { display: block; }
@@ -207,6 +205,21 @@
       return parsed;
     }
 
+    // Hàm tạo chuỗi Text định dạng chuẩn để xuất/copy
+    function generateExportText(qs) {
+      if (!qs || qs.length === 0) return 'Không có câu hỏi nào.';
+      return qs.map(q => {
+        let text = `Câu hỏi: ${q.q}\n`;
+        text += `A. ${q.options[0] || ''}\n`;
+        text += `B. ${q.options[1] || ''}\n`;
+        text += `C. ${q.options[2] || ''}\n`;
+        text += `D. ${q.options[3] || ''}\n`;
+        text += `Đáp án: ${LETTERS[q.answer] || 'A'}\n`;
+        if (q.explain) text += `Giải thích: ${q.explain}\n`;
+        return text;
+      }).join('\n');
+    }
+
     function App() {
       const [questions, setQuestions] = useState(() => load(STORAGE_KEYS.questions, SAMPLE_QUESTIONS));
       const [attempts, setAttempts] = useState(() => load(STORAGE_KEYS.attempts, []));
@@ -231,6 +244,8 @@
       const [bulk, setBulk] = useState('');
       const [form, setForm] = useState({ q: '', A: '', B: '', C: '', D: '', answer: 'A', explain: '' });
       const [selectedIds, setSelectedIds] = useState(new Set());
+      
+      const [exportData, setExportData] = useState(null); // Quản lý modal xuất văn bản
 
       const activeQuestions = useMemo(() => {
         if (!examQuestionIds) return questions;
@@ -393,8 +408,44 @@
         persistAttempts([]);
       }
 
+      // Xử lý nút Download .txt
+      function handleDownload() {
+        if(!exportData) return;
+        const blob = new Blob([exportData], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'export-cau-hoi.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
       return (
         <div className="app">
+          {/* MODAL EXPORT DỮ LIỆU */}
+          {exportData !== null && (
+            <div className="modal-overlay" onClick={(e) => { if(e.target === e.currentTarget) setExportData(null); }}>
+              <div className="modal-content">
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <h2 style={{margin: 0}}>Xuất dữ liệu</h2>
+                  <button onClick={() => setExportData(null)} style={{background: 'transparent', border: 0}}><Icon name="x" size={24}/></button>
+                </div>
+                <textarea readOnly value={exportData} />
+                <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap'}}>
+                  <button className="primary" onClick={() => { 
+                    navigator.clipboard.writeText(exportData); 
+                    alert('Đã copy toàn bộ nội dung vào bộ nhớ tạm!'); 
+                  }}>
+                    <Icon name="copy" size={16}/> Copy toàn bộ
+                  </button>
+                  <button onClick={handleDownload}>
+                    <Icon name="download" size={16}/> Tải file .txt (Mở bằng Word)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="shell">
             <header className="hero">
               <div>
@@ -441,7 +492,6 @@
                   
                   <label style={{ marginTop: 0, textAlign: 'center' }}>Chế độ & Tạo đề</label>
                   
-                  {/* Nút gạt chế độ làm bài (áp dụng cho lần tạo đề tiếp theo) */}
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', justifyContent: 'center' }}>
                     <label className="switch" title="Chế độ khi tạo đề">
                       <input type="checkbox" checked={instantMode} onChange={e => {
@@ -455,24 +505,18 @@
                     </span>
                   </div>
 
-                  {/* Tạo 1 đề ngẫu nhiên */}
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                     <input type="number" min="1" max={questions.length} value={randomCount} onChange={e => setRandomCount(e.target.value)} style={{ width: '70px', padding: '11px' }} title="Số câu" />
                     <button onClick={() => generateRandomExam(Number(randomCount))} style={{ flex: 1 }}>Ngẫu nhiên 1 đề</button>
                   </div>
 
-                  {/* Chia toàn bộ ngân hàng thành các đề nhỏ */}
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                     <input type="number" min="1" max={questions.length} value={chunkSize} onChange={e => setChunkSize(e.target.value)} style={{ width: '70px', padding: '11px' }} title="Số câu mỗi đề" />
                     <button onClick={() => splitExams(Number(chunkSize))} className="primary" style={{ flex: 1 }}>Chia đều ngân hàng</button>
                   </div>
 
-                  {/* Danh sách các đề nhỏ đã chia (Chỉ hiện khi có chia đề) */}
                   {examChunks.length > 0 && (
                     <div style={{ background: '#1c1917', border: '1px solid #44403c', borderRadius: '14px', padding: '12px', marginBottom: '8px' }}>
-                      <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '10px', textAlign: 'center' }}>
-                        Đã chia <b>{examChunks.length}</b> đề (Đang làm Đề {currentChunkIndex + 1})
-                      </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                         {examChunks.map((chunk, i) => (
                           <button 
@@ -493,6 +537,11 @@
                       </div>
                     </div>
                   )}
+
+                  {/* Nút xuất đề hiện tại */}
+                  <button onClick={() => setExportData(generateExportText(activeQuestions))} style={{ marginBottom: '8px' }}>
+                    <Icon name="file-text" size={16}/> Xuất đề hiện tại
+                  </button>
 
                   <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu</button>
 
@@ -572,9 +621,12 @@
                   <div className="list-header">
                     <h2>Danh sách ({questions.length})</h2>
                     <div className="list-actions">
+                      {/* Nút xuất ngân hàng */}
+                      <button onClick={() => setExportData(generateExportText(questions))}>
+                        <Icon name="file-text" size={16}/> Xuất ngân hàng
+                      </button>
                       <button onClick={toggleSelectAll}>
-                        <Icon name={selectedIds.size === questions.length && questions.length > 0 ? "check-square" : "square"} size={16}/>
-                        Chọn tất cả
+                        <Icon name={selectedIds.size === questions.length && questions.length > 0 ? "check-square" : "square"} size={16}/> Chọn tất cả
                       </button>
                       <button onClick={deleteSelected} disabled={selectedIds.size === 0} className="warn">
                         <Icon name="trash" size={16}/> Xóa ({selectedIds.size})
