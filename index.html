@@ -19,14 +19,14 @@
     
     /* Cập nhật font chữ sang Be Vietnam Pro toàn cục */
     body { margin: 0; font-family: 'Be Vietnam Pro', system-ui, Arial, sans-serif; background: #0c0a09; color: #f5f5f4; }
-    button, input, select, textarea { font-family: inherit; } /* Ép các thẻ form dùng chung font */
+    button, input, select, textarea { font-family: inherit; } 
     
     .app { min-height: 100vh; padding: 18px; }
-    .shell { max-width: 1300px; margin: auto; } /* Tăng độ rộng để tiêu đề không xuống dòng */
+    .shell { max-width: 1300px; margin: auto; } 
     .hero, .panel, .tabs { border: 1px solid #292524; background: #1c1917; border-radius: 28px; box-shadow: 0 20px 60px #0006; }
     .hero { padding: 28px; display: flex; justify-content: space-between; gap: 24px; align-items: center; }
     .eyebrow { color: #fdba74; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; margin: 0 0 12px 0; }
-    h1 { font-size: clamp(30px, 4vw, 52px); line-height: 1; margin: 0; white-space: nowrap; } /* white-space để hạn chế rớt dòng */
+    h1 { font-size: clamp(30px, 4vw, 52px); line-height: 1; margin: 0; white-space: nowrap; } 
     h2 { margin-top: 0; }
     .hint { color: #a8a29e; }
     
@@ -68,7 +68,6 @@
     input:checked + .slider { background-color: #fb923c; }
     input:checked + .slider:before { transform: translateX(20px); }
 
-    /* Dùng Flexbox để các thành phần bên trong form tự động giãn */
     .form { display: flex; flex-direction: column; gap: 12px; height: 100%; }
     textarea { min-height: 105px; resize: vertical; line-height: 1.5; }
     .bulk { flex: 1; resize: none; min-height: 250px; } 
@@ -114,7 +113,7 @@
     
     @media(max-width:850px){
       .hero { display: block; }
-      h1 { white-space: normal; } /* Trả lại wrap trên điện thoại cho đỡ lỗi ngang */
+      h1 { white-space: normal; }
       .stats-container { min-width: 0; margin-top: 18px; }
       .stats { grid-template-columns: repeat(2, 1fr); }
       .layout, .form-col { grid-template-columns: 1fr; }
@@ -145,7 +144,9 @@
       attempts: 'quiz_bank_attempts_v2',
       examIds: 'quiz_bank_exam_ids_v2',
       instantMode: 'quiz_bank_instant_mode',         
-      activeInstantMode: 'quiz_bank_active_mode'     
+      activeInstantMode: 'quiz_bank_active_mode',
+      examChunks: 'quiz_bank_exam_chunks_v2',
+      currentChunkIndex: 'quiz_bank_current_chunk_index_v2'
     };
 
     const SAMPLE_QUESTIONS = [
@@ -211,7 +212,11 @@
       const [attempts, setAttempts] = useState(() => load(STORAGE_KEYS.attempts, []));
       
       const [examQuestionIds, setExamQuestionIds] = useState(() => load(STORAGE_KEYS.examIds, null));
-      const [randomCount, setRandomCount] = useState(10);
+      const [examChunks, setExamChunks] = useState(() => load(STORAGE_KEYS.examChunks, []));
+      const [currentChunkIndex, setCurrentChunkIndex] = useState(() => load(STORAGE_KEYS.currentChunkIndex, 0));
+      
+      const [randomCount, setRandomCount] = useState(40);
+      const [chunkSize, setChunkSize] = useState(40);
       
       const [instantMode, setInstantMode] = useState(() => load(STORAGE_KEYS.instantMode, false)); 
       const [activeInstantMode, setActiveInstantMode] = useState(() => load(STORAGE_KEYS.activeInstantMode, false)); 
@@ -266,8 +271,12 @@
         if (questions.length === 0) return;
         const validN = Math.min(Math.max(1, n), questions.length);
         const ids = shuffle(questions).slice(0, validN).map(q => q.id);
+        
         setExamQuestionIds(ids);
         save(STORAGE_KEYS.examIds, ids);
+        
+        setExamChunks([]);
+        save(STORAGE_KEYS.examChunks, []);
         
         setActiveInstantMode(instantMode);
         save(STORAGE_KEYS.activeInstantMode, instantMode);
@@ -275,9 +284,39 @@
         resetExam();
       }
 
+      function splitExams(size) {
+        if (questions.length === 0) return alert('Ngân hàng chưa có câu hỏi nào!');
+        if (size < 1) return;
+        
+        const shuffled = shuffle(questions).map(q => q.id);
+        const chunks = [];
+        for (let i = 0; i < shuffled.length; i += size) {
+          chunks.push(shuffled.slice(i, i + size));
+        }
+        
+        setExamChunks(chunks);
+        save(STORAGE_KEYS.examChunks, chunks);
+        
+        setActiveInstantMode(instantMode);
+        save(STORAGE_KEYS.activeInstantMode, instantMode);
+        
+        selectChunk(0, chunks);
+      }
+
+      function selectChunk(idx, chunksToUse = examChunks) {
+        setCurrentChunkIndex(idx);
+        save(STORAGE_KEYS.currentChunkIndex, idx);
+        setExamQuestionIds(chunksToUse[idx]);
+        save(STORAGE_KEYS.examIds, chunksToUse[idx]);
+        resetExam();
+      }
+
       function useAllQuestions() {
         setExamQuestionIds(null);
         save(STORAGE_KEYS.examIds, null);
+        
+        setExamChunks([]);
+        save(STORAGE_KEYS.examChunks, []);
         
         setActiveInstantMode(true);
         save(STORAGE_KEYS.activeInstantMode, true);
@@ -400,19 +439,61 @@
 
                   <hr style={{ border: 0, borderTop: '1px solid #44403c', margin: '18px 0' }} />
                   
-                  <label style={{ marginTop: 0, textAlign: 'center' }}>Tạo đề ngẫu nhiên</label>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                    <label className="switch" title="Chế độ khi tạo đề ngẫu nhiên">
+                  <label style={{ marginTop: 0, textAlign: 'center' }}>Chế độ & Tạo đề</label>
+                  
+                  {/* Nút gạt chế độ làm bài (áp dụng cho lần tạo đề tiếp theo) */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', justifyContent: 'center' }}>
+                    <label className="switch" title="Chế độ khi tạo đề">
                       <input type="checkbox" checked={instantMode} onChange={e => {
                         setInstantMode(e.target.checked);
                         save(STORAGE_KEYS.instantMode, e.target.checked);
                       }} />
                       <span className="slider"></span>
                     </label>
-                    <input type="number" min="1" max={questions.length} value={randomCount} onChange={e => setRandomCount(e.target.value)} style={{ width: '80px', padding: '11px' }} />
-                    <button onClick={() => generateRandomExam(Number(randomCount))} className="primary" style={{ flex: 1 }}>Ngẫu nhiên</button>
+                    <span style={{ fontSize: '12px', color: '#a8a29e' }}>
+                      {instantMode ? 'Tạo đề: Hiện đáp án ngay' : 'Tạo đề: Nộp mới hiện đáp án'}
+                    </span>
                   </div>
-                  
+
+                  {/* Tạo 1 đề ngẫu nhiên */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input type="number" min="1" max={questions.length} value={randomCount} onChange={e => setRandomCount(e.target.value)} style={{ width: '70px', padding: '11px' }} title="Số câu" />
+                    <button onClick={() => generateRandomExam(Number(randomCount))} style={{ flex: 1 }}>Ngẫu nhiên 1 đề</button>
+                  </div>
+
+                  {/* Chia toàn bộ ngân hàng thành các đề nhỏ */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input type="number" min="1" max={questions.length} value={chunkSize} onChange={e => setChunkSize(e.target.value)} style={{ width: '70px', padding: '11px' }} title="Số câu mỗi đề" />
+                    <button onClick={() => splitExams(Number(chunkSize))} className="primary" style={{ flex: 1 }}>Chia đều ngân hàng</button>
+                  </div>
+
+                  {/* Danh sách các đề nhỏ đã chia (Chỉ hiện khi có chia đề) */}
+                  {examChunks.length > 0 && (
+                    <div style={{ background: '#1c1917', border: '1px solid #44403c', borderRadius: '14px', padding: '12px', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '10px', textAlign: 'center' }}>
+                        Đã chia <b>{examChunks.length}</b> đề (Đang làm Đề {currentChunkIndex + 1})
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                        {examChunks.map((chunk, i) => (
+                          <button 
+                            key={i} 
+                            onClick={() => selectChunk(i)}
+                            style={{ 
+                              padding: '6px 0', 
+                              fontSize: '12px',
+                              background: i === currentChunkIndex ? '#fb923c' : '#292524',
+                              color: i === currentChunkIndex ? '#1c1917' : '#f5f5f4',
+                              borderColor: i === currentChunkIndex ? '#fb923c' : '#44403c',
+                              margin: 0
+                            }}
+                          >
+                            Đề {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu</button>
 
                   <div className="gridBtns">
