@@ -74,10 +74,14 @@ Nhiệm vụ:
       }
     };
 
-    // Cố định duy nhất gemini-3.1-flash-lite
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+    // Định tuyến qua Cloudflare AI Gateway để giải quyết triệt để lỗi User location not supported
+    const accountId = "4df37c88ab53d12373d0125ce2200f93";
+    const gatewayId = "quiz-gateway";
+    const model = "gemini-2.0-flash";
 
-    let res = await fetch(geminiUrl, {
+    const gatewayUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    let res = await fetch(gatewayUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -85,10 +89,10 @@ Nhiệm vụ:
 
     let data = await res.json();
 
-    // Tự động thử lại 1 lần nếu máy chủ phản hồi quá tải tạm thời
+    // Tự động thử lại 1 lần nếu máy chủ Google bận
     if (!res.ok && (res.status === 503 || data.error?.message?.includes("high demand"))) {
       await new Promise(r => setTimeout(r, 1500));
-      res = await fetch(geminiUrl, {
+      res = await fetch(gatewayUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -98,7 +102,7 @@ Nhiệm vụ:
 
     if (!res.ok) {
       return new Response(
-        JSON.stringify({ error: data.error?.message || "Lỗi phản hồi từ Gemini API" }),
+        JSON.stringify({ error: data.error?.message || "Lỗi phản hồi từ Gemini qua Gateway" }),
         { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
