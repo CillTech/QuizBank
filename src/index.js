@@ -2,22 +2,37 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Cấu hình đầy đủ CORS Headers
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // Xử lý Preflight Request từ trình duyệt
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Xử lý API chuẩn hóa và giải đề tại /api/process
+    const apiKey = env.GEMINI_API_KEY;
+
+    // Route phụ: /api/models dùng để kiểm tra xem tài khoản đang có model nào
+    if (url.pathname === "/api/models" && request.method === "GET") {
+      if (!apiKey) {
+        return new Response(JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const listData = await listRes.json();
+      return new Response(JSON.stringify(listData), {
+        status: listRes.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Route chính: xử lý câu hỏi và hình ảnh
     if (url.pathname === "/api/process" && request.method === "POST") {
       try {
-        const apiKey = env.GEMINI_API_KEY;
         if (!apiKey) {
           return new Response(
             JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trên Cloudflare Bindings" }),
@@ -89,12 +104,17 @@ Nhiệm vụ:
           }
         };
 
-        // Danh sách model ưu tiên (tự động chuyển sang model tiếp theo nếu gặp lỗi quá tải)
-        const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-3.8-flash"];
+        // Danh sách model tương thích
+        const CANDIDATE_MODELS = [
+          "gemini-2.0-flash",
+          "gemini-2.0-flash-exp",
+          "gemini-1.5-flash-latest"
+        ];
+
         let geminiResponse;
         let data;
 
-        for (const model of MODELS) {
+        for (const model of CANDIDATE_MODELS) {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
           geminiResponse = await fetch(geminiUrl, {
@@ -105,28 +125,29 @@ Nhiệm vụ:
 
           data = await geminiResponse.json();
 
-          // Nếu gọi thành công, thoát vòng lặp ngay
           if (geminiResponse.ok) {
             break;
           }
 
           const errMsg = data.error?.message || "";
-          // Nếu lỗi không phải do nghẽn tải hoặc hết hạn model, dừng lại để báo lỗi thực tế
-          const isHighDemandOrUnavailable =
+          // Nếu model không tồn tại hoặc nghẽn, thử sang model tiếp theo trong danh sách
+          const canRetryNextModel =
+            geminiResponse.status === 404 ||
             geminiResponse.status === 503 ||
+            errMsg.includes("not found") ||
             errMsg.includes("high demand") ||
             errMsg.includes("no longer available");
 
-          if (!isHighDemandOrUnavailable) {
+          if (!canRetryNextModel) {
             break;
           }
         }
 
-        if (!geminiResponse.ok) {
+        if (!geminiResponse || !geminiResponse.ok) {
           return new Response(
-            JSON.stringify({ error: data.error?.message || "Lỗi phản hồi từ Gemini API" }),
+            JSON.stringify({ error: data?.error?.message || "Không thể kết nối đến Gemini API" }),
             {
-              status: geminiResponse.status,
+              status: geminiResponse ? geminiResponse.status : 500,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             }
           );
@@ -149,7 +170,6 @@ Nhiệm vụ:
       }
     }
 
-    // Trả về file giao diện tĩnh (HTML/CSS/JS) trong thư mục public
     return env.ASSETS ? env.ASSETS.fetch(request) : new Response("Not Found", { status: 404 });
   }
 };
