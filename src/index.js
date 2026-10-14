@@ -2,14 +2,24 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 1. Đón request gọi AI 
+    // Cấu hình CORS Header
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+
     if (url.pathname === "/api/process" && request.method === "POST") {
       try {
         const apiKey = env.GEMINI_API_KEY;
         if (!apiKey) {
           return new Response(JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trên Cloudflare" }), {
             status: 500,
-            headers: { "Content-Type": "application/json" }
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
@@ -17,14 +27,14 @@ export default {
         if (!text && !imageBase64) {
           return new Response(JSON.stringify({ error: "Không tìm thấy nội dung văn bản hoặc hình ảnh" }), {
             status: 400,
-            headers: { "Content-Type": "application/json" }
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
         const parts = [{
-          text: `Bạn là trợ lý chuẩn hóa và giải đề thi trắc nghiệm.
+          text: `Bạn là trợ lý giải đề thi trắc nghiệm.
 Nhiệm vụ:
-1. Đọc kỹ nội dung câu hỏi từ hình ảnh hoặc văn bản được cung cấp.
+1. Đọc nội dung câu hỏi từ hình ảnh hoặc văn bản.
 2. Trích xuất đúng 4 lựa chọn [A, B, C, D] cho mỗi câu.
 3. Nếu đề chưa có đáp án, hãy suy luận chính xác đáp án đúng (0: A, 1: B, 2: C, 3: D).
 4. Viết giải thích ngắn gọn, súc tích cho đáp án đúng.
@@ -72,27 +82,26 @@ Nhiệm vụ:
 
         const data = await geminiResponse.json();
         if (!geminiResponse.ok) {
-          return new Response(JSON.stringify({ error: data.error?.message || "Lỗi từ Gemini" }), {
+          return new Response(JSON.stringify({ error: data.error?.message || "Lỗi từ Gemini API" }), {
             status: geminiResponse.status,
-            headers: { "Content-Type": "application/json" }
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
         const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
         return new Response(rawJson, {
           status: 200,
-          headers: { "Content-Type": "application/json" }
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
 
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
+        return new Response(JSON.stringify({ error: err.message || "Lỗi máy chủ nội bộ" }), {
           status: 500,
-          headers: { "Content-Type": "application/json" }
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
     }
 
-    // 2. Với tất cả đường dẫn khác, trả về file tĩnh (index.html) trong thư mục public
-    return env.ASSETS.fetch(request);
+    return env.ASSETS ? env.ASSETS.fetch(request) : new Response("Not Found", { status: 404 });
   }
 };
