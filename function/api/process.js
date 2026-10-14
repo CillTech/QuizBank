@@ -10,24 +10,37 @@ export async function onRequestPost(context) {
       });
     }
 
-    const { text } = await request.json();
-    if (!text) {
-      return new Response(JSON.stringify({ error: "Không có nội dung câu hỏi" }), {
+    const { text, imageBase64, mimeType } = await request.json();
+    if (!text && !imageBase64) {
+      return new Response(JSON.stringify({ error: "Không tìm thấy nội dung văn bản hoặc hình ảnh" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const prompt = `Bạn là trợ lý chuẩn hóa đề thi trắc nghiệm.
-Dưới đây là nội dung thô:
----
-${text}
----
+    const promptText = `Bạn là trợ lý chuẩn hóa và giải đề thi trắc nghiệm.
 Nhiệm vụ:
-1. Nhận diện từng câu hỏi và trích xuất đúng 4 lựa chọn [A, B, C, D].
-2. Nếu thiếu đáp án, suy luận chính xác đáp án đúng (0: A, 1: B, 2: C, 3: D).
-3. Nếu thiếu giải thích, hãy viết giải thích ngắn gọn, súc tích.
-4. Trả về mảng JSON theo đúng định dạng.`;
+1. Đọc kỹ nội dung câu hỏi từ hình ảnh hoặc văn bản được cung cấp.
+2. Trích xuất đúng 4 lựa chọn [A, B, C, D] cho mỗi câu.
+3. Nếu đề chưa có đáp án, hãy suy luận chính xác đáp án đúng (0: A, 1: B, 2: C, 3: D).
+4. Viết giải thích ngắn gọn, súc tích cho đáp án đúng.
+5. Luôn trả về mảng JSON theo đúng định dạng.`;
+
+    // Chuẩn bị parts gửi sang Gemini
+    const parts = [{ text: promptText }];
+
+    if (text) {
+      parts.push({ text: `Dữ liệu văn bản kèm theo:\n${text}` });
+    }
+
+    if (imageBase64) {
+      parts.push({
+        inline_data: {
+          mime_type: mimeType || "image/jpeg",
+          data: imageBase64
+        }
+      });
+    }
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -35,7 +48,7 @@ Nhiệm vụ:
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
