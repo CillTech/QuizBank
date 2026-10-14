@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quiz Bank - Luyện thi trắc nghiệm</title>
+  <title>Quiz Bank - Luyện thi trắc nghiệm AI</title>
   
-  <!-- Nhúng font Be Vietnam Pro tối ưu cho tiếng Việt -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -112,6 +111,10 @@
     .ai-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: #431407; color: #fdba74; font-size: 12px; font-weight: 800; border: 1px solid #78350f; }
     .pulse { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+    /* Vùng hiển thị xem trước ảnh */
+    .img-preview-box { margin-top: 10px; display: flex; align-items: center; gap: 12px; background: #0c0a09; padding: 10px; border-radius: 14px; border: 1px solid #44403c; }
+    .img-preview-box img { max-height: 90px; border-radius: 8px; object-fit: contain; background: #1c1917; }
     
     @media(max-width:850px){
       .hero { display: block; }
@@ -223,7 +226,20 @@
       }).join('\n');
     }
 
-    // Trích xuất văn bản từ file upload (.docx, .txt, .json)
+    // Chuyển file ảnh sang Base64
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64Data = reader.result.split(',')[1];
+          resolve({ base64: base64Data, mimeType: file.type });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Trích xuất file văn bản (.docx, .txt, .json)
     async function extractTextFromFile(file) {
       const ext = file.name.split('.').pop().toLowerCase();
       if (ext === 'json') {
@@ -236,7 +252,7 @@
         return { type: 'text', data: text };
       }
       if (ext === 'docx') {
-        if (!window.mammoth) throw new Error('Thư viện mammoth.js chưa tải xong.');
+        if (!window.mammoth) throw new Error('Thư viện mammoth.js chưa sẵn sàng.');
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
         return { type: 'text', data: result.value };
@@ -244,12 +260,12 @@
       throw new Error('Chỉ hỗ trợ file .docx, .txt, hoặc .json');
     }
 
-    // Gọi trực tiếp Cloudflare Pages Functions tại /api/process
-    async function processQuestionsWithAI(rawText) {
+    // Gọi Cloudflare Pages Function tại /api/process (hỗ trợ cả text lẫn ảnh)
+    async function processWithAI({ text = '', imageBase64 = null, mimeType = null }) {
       const response = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: rawText })
+        body: JSON.stringify({ text, imageBase64, mimeType })
       });
 
       if (!response.ok) {
@@ -287,9 +303,39 @@
       
       const [exportData, setExportData] = useState(null);
 
-      // Trạng thái AI Loading
+      // State cho Image OCR & AI Loading
+      const [selectedImage, setSelectedImage] = useState(null); // { file, previewUrl, base64, mimeType }
       const [isAiLoading, setIsAiLoading] = useState(false);
       const [statusText, setStatusText] = useState('');
+
+      // Lắng nghe sự kiện paste (Ctrl + V) ảnh chụp màn hình trực tiếp
+      useEffect(() => {
+        function handlePaste(e) {
+          if (mode !== 'bank') return;
+          const items = e.clipboardData?.items;
+          if (!items) return;
+
+          for (const item of items) {
+            if (item.type.startsWith('image/')) {
+              const file = item.getAsFile();
+              if (file) {
+                fileToBase64(file).then(({ base64, mimeType }) => {
+                  setSelectedImage({
+                    file,
+                    previewUrl: URL.createObjectURL(file),
+                    base64,
+                    mimeType
+                  });
+                });
+                break;
+              }
+            }
+          }
+        }
+
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+      }, [mode]);
 
       const activeQuestions = useMemo(() => {
         if (!examQuestionIds) return questions;
@@ -405,7 +451,7 @@
 
       function addBulk() {
         const parsed = parseBulk(bulk);
-        if (!parsed.length) return alert('Chưa tách được câu hỏi theo cú pháp chuẩn. Hãy bấm "AI Chuẩn Hóa & Giải" để AI tự xử lý.');
+        if (!parsed.length) return alert('Chưa tách được câu hỏi theo mẫu chuẩn.');
         persistQuestions([...questions, ...parsed]);
         setBulk('');
         alert(`Đã thêm ${parsed.length} câu hỏi.`);
@@ -417,8 +463,8 @@
 
         try {
           setIsAiLoading(true);
-          setStatusText('AI đang giải đề và chuẩn hóa...');
-          const aiQuestions = await processQuestionsWithAI(bulk);
+          setStatusText('AI đang đọc đề và chuẩn hóa câu hỏi...');
+          const aiQuestions = await processWithAI({ text: bulk });
           const formatted = aiQuestions.map(item => ({
             ...item,
             id: crypto.randomUUID(),
@@ -426,22 +472,22 @@
           }));
           persistQuestions([...questions, ...formatted]);
           setBulk('');
-          alert(`Thành công! AI đã trích xuất và thêm ${formatted.length} câu hỏi.`);
+          alert(`Thành công! AI đã trích xuất ${formatted.length} câu hỏi.`);
         } catch (err) {
-          alert('Lỗi xử lý AI: ' + err.message);
+          alert('Lỗi AI: ' + err.message);
         } finally {
           setIsAiLoading(false);
           setStatusText('');
         }
       }
 
-      // Xử lý file upload
+      // Xử lý nạp file tài liệu (.docx, .txt, .json)
       async function handleFileUpload(e) {
         const file = e.target.files[0];
         if (!file) return;
 
         try {
-          setStatusText('Đang đọc tệp tin...');
+          setStatusText('Đang nạp file...');
           const extracted = await extractTextFromFile(file);
 
           if (extracted.type === 'json') {
@@ -453,27 +499,72 @@
               explain: item.explain || ''
             }));
             persistQuestions([...questions, ...newItems]);
-            alert(`Đã nhập thành công ${newItems.length} câu từ file JSON!`);
+            alert(`Đã nhập ${newItems.length} câu từ file JSON!`);
             return;
           }
 
-          // File Word (.docx) hoặc .txt
           setIsAiLoading(true);
-          setStatusText('AI đang đọc đề, suy luận đáp án & chuẩn hóa cấu trúc...');
-          const aiQuestions = await processQuestionsWithAI(extracted.data);
+          setStatusText('AI đang đọc file văn bản & suy luận đáp án...');
+          const aiQuestions = await processWithAI({ text: extracted.data });
           const formatted = aiQuestions.map(item => ({
             ...item,
             id: crypto.randomUUID(),
             options: (item.options || []).slice(0, 4)
           }));
           persistQuestions([...questions, ...formatted]);
-          alert(`AI đã thêm thành công ${formatted.length} câu hỏi vào ngân hàng!`);
+          alert(`AI đã thêm thành công ${formatted.length} câu hỏi!`);
         } catch (err) {
-          alert('Lỗi xử lý file: ' + err.message);
+          alert('Lỗi: ' + err.message);
         } finally {
           setIsAiLoading(false);
           setStatusText('');
           e.target.value = '';
+        }
+      }
+
+      // Chọn file ảnh
+      async function handleImageSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const { base64, mimeType } = await fileToBase64(file);
+          setSelectedImage({
+            file,
+            previewUrl: URL.createObjectURL(file),
+            base64,
+            mimeType
+          });
+        } catch (err) {
+          alert('Không thể đọc ảnh: ' + err.message);
+        }
+      }
+
+      // Gửi hình ảnh cho AI phân tích
+      async function handleProcessImageWithAI() {
+        if (!selectedImage) return;
+
+        try {
+          setIsAiLoading(true);
+          setStatusText('AI đang nhận diện chữ (OCR) trong ảnh và giải đề...');
+          const aiQuestions = await processWithAI({
+            imageBase64: selectedImage.base64,
+            mimeType: selectedImage.mimeType
+          });
+
+          const formatted = aiQuestions.map(item => ({
+            ...item,
+            id: crypto.randomUUID(),
+            options: (item.options || []).slice(0, 4)
+          }));
+
+          persistQuestions([...questions, ...formatted]);
+          setSelectedImage(null);
+          alert(`Thành công! AI đã nhận diện và thêm ${formatted.length} câu hỏi từ ảnh.`);
+        } catch (err) {
+          alert('Lỗi xử lý ảnh: ' + err.message);
+        } finally {
+          setIsAiLoading(false);
+          setStatusText('');
         }
       }
 
@@ -706,34 +797,70 @@
 
             {mode === 'bank' && (
               <section className="bank-layout">
-                {/* BẢNG TẢI FILE AI */}
+                {/* BẢNG TẢI FILE & NHẬN DIỆN HÌNH ẢNH */}
                 <div className="panel form" style={{ border: '1px solid #78350f' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Icon name="sparkles" size={22}/> Tải file đề thi (AI Tự Động Định Dạng & Giải Đề)
+                      <Icon name="sparkles" size={22}/> Nhập Đề Tự Động (Hỗ trợ File Word, Text & Hình ảnh)
                     </h2>
-                    <span className="ai-badge">Gemini Serverless</span>
+                    <span className="ai-badge">Gemini OCR & Solver</span>
                   </div>
 
-                  <div style={{ marginTop: '8px' }}>
-                    <label style={{ marginTop: 0 }}>Chọn tệp (.docx, .txt, .json):</label>
-                    <input 
-                      type="file" 
-                      accept=".docx,.txt,.json" 
-                      onChange={handleFileUpload} 
-                      disabled={isAiLoading}
-                      style={{ padding: '9px', background: '#0c0a09' }}
-                    />
-                    {isAiLoading ? (
-                      <span className="pulse" style={{ color: '#fdba74', display: 'inline-block', marginTop: '8px', fontSize: '13px', fontWeight: 700 }}>
-                        ⏳ {statusText}
-                      </span>
-                    ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginTop: '10px' }}>
+                    {/* Cột 1: Tải file Word/Text */}
+                    <div>
+                      <label style={{ marginTop: 0 }}><Icon name="file-text" size={16}/> Tệp văn bản (.docx, .txt, .json):</label>
+                      <input 
+                        type="file" 
+                        accept=".docx,.txt,.json" 
+                        onChange={handleFileUpload} 
+                        disabled={isAiLoading}
+                        style={{ padding: '9px', background: '#0c0a09' }}
+                      />
                       <small style={{ color: '#a8a29e', display: 'block', marginTop: '6px', fontSize: '12px' }}>
-                        * Hỗ trợ file Word (.docx) hoặc file Text thô. AI sẽ tự động tách câu, giải đáp án và thêm lời giải thích.
+                        * AI sẽ đọc nội dung, tự phân tách câu hỏi và bổ sung đáp án.
                       </small>
-                    )}
+                    </div>
+
+                    {/* Cột 2: Tải ảnh hoặc dán ảnh chụp màn hình */}
+                    <div>
+                      <label style={{ marginTop: 0 }}><Icon name="image" size={16}/> Ảnh đề thi (.png, .jpg, .webp) hoặc bấm Ctrl + V:</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageSelect} 
+                        disabled={isAiLoading}
+                        style={{ padding: '9px', background: '#0c0a09' }}
+                      />
+                      
+                      {selectedImage && (
+                        <div className="img-preview-box">
+                          <img src={selectedImage.previewUrl} alt="Preview" />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700 }}>Ảnh đã chọn</div>
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                              <button className="primary" onClick={handleProcessImageWithAI} disabled={isAiLoading} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                                <Icon name="sparkles" size={14}/> Đọc & Giải Ảnh
+                              </button>
+                              <button onClick={() => setSelectedImage(null)} disabled={isAiLoading} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                                Bỏ chọn
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <small style={{ color: '#a8a29e', display: 'block', marginTop: '6px', fontSize: '12px' }}>
+                        * Bạn có thể chụp màn hình câu hỏi rồi nhấn <b>Ctrl + V</b> trực tiếp tại đây.
+                      </small>
+                    </div>
                   </div>
+
+                  {isAiLoading && (
+                    <div style={{ marginTop: '10px', padding: '12px', background: '#292524', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="pulse" style={{ color: '#fb923c', fontWeight: 800 }}>⏳ {statusText}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-col">
