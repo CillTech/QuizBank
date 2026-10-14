@@ -1,17 +1,29 @@
-export async function onRequestPost(context) {
+export async function onRequest(context) {
   const { request, env } = context;
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
+
+  // Trả về preflight cho browser
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ message: "API route /api/process is ready!" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
 
   try {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trên Cloudflare Pages" }),
+        JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trong Environment variables của Pages" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -34,10 +46,7 @@ Nhiệm vụ:
 5. Luôn trả về mảng JSON theo đúng định dạng được chỉ định.`
     }];
 
-    if (text) {
-      parts.push({ text: `Nội dung văn bản:\n${text}` });
-    }
-
+    if (text) parts.push({ text: `Nội dung văn bản:\n${text}` });
     if (imageBase64) {
       parts.push({
         inline_data: {
@@ -74,34 +83,31 @@ Nhiệm vụ:
       }
     };
 
-    const accountId = "4df37c88ab53d12373d0125ce2200f93";
-    const gatewayId = "quiz-gateway";
-    const model = "gemini-2.0-flash-lite";
+    // Gọi thẳng Google với model gemini-2.0-flash-lite
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
 
-    // Truyền API Key qua header thay vì query param
-    const gatewayUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio/v1beta/models/${model}:generateContent`;
-
-    const res = await fetch(gatewayUrl, {
+    let res = await fetch(geminiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    const resText = await res.text();
-    let data;
-    try {
-      data = JSON.parse(resText);
-    } catch {
-      data = { rawText: resText };
+    let data = await res.json();
+
+    // Thử lại nếu gặp bận tải
+    if (!res.ok && (res.status === 503 || data.error?.message?.includes("high demand"))) {
+      await new Promise(r => setTimeout(r, 1200));
+      res = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      data = await res.json();
     }
 
     if (!res.ok) {
-      const errDetail = data.error?.message || data.message || resText || "Không rõ nguyên nhân";
       return new Response(
-        JSON.stringify({ error: `[Status ${res.status}] ${errDetail}` }),
+        JSON.stringify({ error: data.error?.message || "Lỗi phản hồi từ Gemini API" }),
         { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -114,18 +120,8 @@ Nhiệm vụ:
 
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message || "Lỗi xử lý server" }),
+      JSON.stringify({ error: err.message || "Lỗi xử lý máy chủ" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-}
-
-export async function onRequestOptions() {
-  return new Response(null, {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    }
-  });
 }
