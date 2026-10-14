@@ -1,1001 +1,791 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quiz Bank</title>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" crossorigin="anonymous"></script>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuizBank - Ôn Thi Trắc Nghiệm</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Mammoth.js để đọc file Word (.docx) trực tiếp trên trình duyệt -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    * { box-sizing: border-box; }
-    
-    body { margin: 0; font-family: 'Be Vietnam Pro', system-ui, Arial, sans-serif; background: #0c0a09; color: #f5f5f4; }
-    button, input, select, textarea { font-family: inherit; } 
-    
-    .app { min-height: 100vh; padding: 18px; }
-    .shell { max-width: 1300px; margin: auto; } 
-    .hero, .panel, .tabs { border: 1px solid #292524; background: #1c1917; border-radius: 28px; box-shadow: 0 20px 60px #0006; }
-    .hero { padding: 28px; display: flex; justify-content: space-between; gap: 24px; align-items: center; }
-    .eyebrow { color: #fdba74; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; margin: 0 0 12px 0; }
-    h1 { font-size: clamp(30px, 4vw, 52px); line-height: 1; margin: 0; white-space: nowrap; } 
-    h2 { margin-top: 0; }
-    .hint { color: #a8a29e; }
-    
-    .stats-container { display: flex; flex-direction: column; gap: 10px; min-width: 430px; }
-    .stat-full { background: #292524; border-radius: 18px; padding: 14px; display: flex; justify-content: center; align-items: center; gap: 8px; }
-    .stat-full b { font-size: 27px; line-height: 1; }
-    .stat-full span { font-size: 14px; color: #a8a29e; }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .stats div { background: #292524; border-radius: 18px; padding: 14px; text-align: center; }
-    .stats b { display: block; font-size: 27px; line-height: 1; margin-bottom: 4px; }
-    .stats span { font-size: 12px; color: #a8a29e; }
-
-    .tabs { margin: 16px 0; padding: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .tabs button, .side button, .form button, .bankItem button, .list-actions button { display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
-    .tabs button { border: 0; border-radius: 18px; background: transparent; color: #d6d3d1; padding: 12px 18px; font-weight: 900; cursor: pointer; }
-    .tabs .active { background: #fb923c; color: #1c1917; }
-    
-    .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
-    .bank-layout { display: flex; flex-direction: column; gap: 16px; }
-    .form-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
-    
-    .panel { padding: 20px; }
-    .side { height: max-content; position: sticky; top: 16px; }
-    .main { min-height: 560px; }
-    label { display: block; margin: 12px 0 7px; font-weight: 800; color: #d6d3d1; }
-    select, input[type="text"], input[type="number"], textarea { width: 100%; border: 1px solid #44403c; background: #0c0a09; color: #f5f5f4; border-radius: 14px; padding: 12px; font-size: 15px; }
-    
-    .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #44403c; transition: .2s; border-radius: 24px; }
-    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: #f5f5f4; transition: .2s; border-radius: 50%; }
-    input:checked + .slider { background-color: #fb923c; }
-    input:checked + .slider:before { transform: translateX(20px); }
-
-    .form { display: flex; flex-direction: column; gap: 12px; height: 100%; }
-    textarea { min-height: 105px; resize: vertical; line-height: 1.5; }
-    .bulk { flex: 1; resize: none; min-height: 250px; } 
-    
-    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    button { border: 1px solid #44403c; background: #292524; color: #f5f5f4; border-radius: 14px; padding: 11px 13px; font-weight: 900; font-size: 14px; cursor: pointer; }
-    button:hover { background: #44403c; }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    .primary { background: #fb923c!important; color: #1c1917!important; border-color: #fb923c!important; }
-    .warn { background: #78350f!important; border-color: #f59e0b!important; }
-    .danger { background: #4c0519!important; border-color: #fb7185!important; color: #fecdd3!important; }
-    .danger:hover { background: #881337!important; }
-    .side > button { width: 100%; margin-top: 8px; }
-    .gridBtns { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-top: 14px; }
-    .gridBtns button { padding: 9px 0; font-size: 13px; }
-    .now { outline: 2px solid #fdba74; }
-    .picked { border-color: #fb923c!important; background: #431407!important; }
-    .good, .correct { border-color: #34d399!important; background: #064e3b!important; }
-    .bad, .wrong { border-color: #fb7185!important; background: #4c0519!important; }
-    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-    .chips span { background: #292524; border-radius: 999px; padding: 7px 12px; font-weight: 900; color: #fed7aa; }
-    .main h2 { font-size: clamp(22px, 3vw, 34px); line-height: 1.35; margin-bottom: 18px; }
-    .options { display: grid; gap: 12px; margin-top: 24px; }
-    .options button { text-align: left; padding: 17px; font-size: 16px; justify-content: flex-start; line-height: 1.4; }
-    .options b { color: #fdba74; margin-right: 8px; }
-    .explain { margin-top: 22px; border-radius: 20px; padding: 18px; border: 1px solid; line-height: 1.5; }
-    .explain.ok { border-color: #34d399; background: #064e3b99; }
-    .explain.no { border-color: #fb7185; background: #4c051999; }
-    
-    .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-    .list-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .bankList { display: grid; gap: 10px; max-height: 500px; overflow: auto; padding-right: 4px; }
-    .bankItem { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; border: 1px solid #292524; background: #0c0a09; border-radius: 16px; padding: 16px; transition: 0.2s; }
-    .bankItem.selected { border-color: #fb923c; background: #1a100c; }
-    .bankItem-content { flex: 1; }
-    .bankItem p { margin: 6px 0 0; color: #a8a29e; font-size: 14px; line-height: 1.4; }
-    input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #fb923c; margin-top: 4px; }
-    .history { display: grid; gap: 12px; }
-    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;}
-    .history article { display: flex; justify-content: space-between; align-items: center; border: 1px solid #292524; background: #0c0a09; border-radius: 18px; padding: 16px; }
-    .history-info p { margin: 6px 0 0; color: #a8a29e; }
-    .empty { text-align: center; color: #a8a29e; padding: 80px 0; }
-    
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; backdrop-filter: blur(4px); }
-    .modal-content { background: #1c1917; border: 1px solid #44403c; border-radius: 20px; padding: 24px; width: 100%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px #0009; }
-    .modal-content textarea { flex: 1; min-height: 400px; font-family: monospace; font-size: 14px; white-space: pre-wrap; background: #0c0a09; border-radius: 12px; }
-
-    .ai-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: #431407; color: #fdba74; font-size: 12px; font-weight: 800; border: 1px solid #78350f; }
-    .pulse { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-
-    /* Vùng hiển thị xem trước ảnh */
-    .img-preview-box { margin-top: 10px; display: flex; align-items: center; gap: 12px; background: #0c0a09; padding: 10px; border-radius: 14px; border: 1px solid #44403c; }
-    .img-preview-box img { max-height: 90px; border-radius: 8px; object-fit: contain; background: #1c1917; }
-    
-    @media(max-width:850px){
-      .hero { display: block; }
-      h1 { white-space: normal; }
-      .stats-container { min-width: 0; margin-top: 18px; }
-      .stats { grid-template-columns: repeat(2, 1fr); }
-      .layout, .form-col { grid-template-columns: 1fr; }
-      .side { position: static; }
-      .app { padding: 10px; }
-      .bulk { min-height: 300px; }
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
     }
   </style>
 </head>
-<body>
-  <div id="root"></div>
+<body class="min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
 
-  <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
-
-    const Icon = ({ name, size = 18 }) => {
-      useEffect(() => {
-        if (window.lucide) {
-          window.lucide.createIcons();
-        }
-      });
-      return <i data-lucide={name.toLowerCase()} style={{ width: size, height: size, display: 'inline-block' }}></i>;
-    };
-
-    const LETTERS = ['A', 'B', 'C', 'D'];
-    const STORAGE_KEYS = {
-      questions: 'quiz_bank_questions_v2',
-      attempts: 'quiz_bank_attempts_v2',
-      examIds: 'quiz_bank_exam_ids_v2',
-      instantMode: 'quiz_bank_instant_mode',         
-      activeInstantMode: 'quiz_bank_active_mode',
-      examChunks: 'quiz_bank_exam_chunks_v2',
-      currentChunkIndex: 'quiz_bank_current_chunk_index_v2'
-    };
-
-    const SAMPLE_QUESTIONS = [
-      {
-        id: crypto.randomUUID(),
-        q: 'Vấn đề cơ bản của triết học theo Ph. Ăngghen là quan hệ nào?',
-        options: ['Quan hệ giữa tư duy và tồn tại', 'Quan hệ giữa tồn tại và thực tiễn', 'Quan hệ giữa tư duy và nhận thức', 'Quan hệ giữa thực tiễn và chân lý'],
-        answer: 0, explain: 'Vấn đề cơ bản của triết học là quan hệ giữa tư duy và tồn tại.'
-      },
-      {
-        id: crypto.randomUUID(),
-        q: 'Cụm từ nào là hạt nhân trong định nghĩa vật chất của Lênin?',
-        options: ['Thực tại khách quan', 'Cảm giác chủ quan', 'Ý niệm tuyệt đối', 'Tinh thần khách quan'],
-        answer: 0, explain: 'Thực tại khách quan là thuộc tính cơ bản nhất của vật chất.'
-      }
-    ];
-
-    function load(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
-    }
-    function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
-    
-    function shuffle(arr) {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    function parseBulk(text) {
-      const blocks = text.split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean);
-      const parsed = [];
-
-      for (const block of blocks) {
-        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-        let q = '';
-        const options = [];
-        let answerLetter = '';
-        let explain = '';
-
-        for (const line of lines) {
-          const clean = line.replace(/^\d+[).:-]?\s*/, '').trim();
-          if (/^(câu hỏi|question)\s*:/i.test(line)) q = line.split(':').slice(1).join(':').trim();
-          else if (/^[A-D][).:-]\s*/i.test(line)) options.push(line.replace(/^[A-D][).:-]\s*/i, '').trim());
-          else if (/^(đáp án|answer)\s*:/i.test(line)) answerLetter = (line.split(':').slice(1).join(':').trim()[0] || '').toUpperCase();
-          else if (/^(giải thích|explain|explanation)\s*:/i.test(line)) explain = line.split(':').slice(1).join(':').trim();
-          else if (!q && clean.length > 8) q = clean;
-        }
-
-        if (q && options.length >= 2) {
-          while (options.length < 4) options.push('Chưa nhập đáp án');
-          const answer = Math.max(0, LETTERS.indexOf(answerLetter));
-          parsed.push({ id: crypto.randomUUID(), q, options: options.slice(0, 4), answer, explain });
-        }
-      }
-      return parsed;
-    }
-
-    function generateExportText(qs) {
-      if (!qs || qs.length === 0) return 'Không có câu hỏi nào.';
-      return qs.map(q => {
-        let text = `Câu hỏi: ${q.q}\n`;
-        text += `A. ${q.options[0] || ''}\n`;
-        text += `B. ${q.options[1] || ''}\n`;
-        text += `C. ${q.options[2] || ''}\n`;
-        text += `D. ${q.options[3] || ''}\n`;
-        text += `Đáp án: ${LETTERS[q.answer] || 'A'}\n`;
-        if (q.explain) text += `Giải thích: ${q.explain}\n`;
-        return text;
-      }).join('\n');
-    }
-
-    // Chuyển file ảnh sang Base64
-    function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            
-            // Giới hạn chiều dài/rộng tối đa 1600px để gửi nhanh và nhẹ
-            const MAX_DIM = 1600;
-            if (width > height && width > MAX_DIM) {
-              height = Math.round((height * MAX_DIM) / width);
-              width = MAX_DIM;
-            } else if (height > MAX_DIM) {
-              width = Math.round((width * MAX_DIM) / height);
-              height = MAX_DIM;
-            }
-    
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-    
-            // Xuất ra base64 với định dạng jpeg chất lượng 0.85
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            resolve({
-              base64: dataUrl.split(',')[1],
-              mimeType: 'image/jpeg'
-            });
-          };
-          img.onerror = reject;
-          img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-
-    // Trích xuất file văn bản (.docx, .txt, .json)
-    async function extractTextFromFile(file) {
-      const ext = file.name.split('.').pop().toLowerCase();
-      if (ext === 'json') {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        return { type: 'json', data: Array.isArray(data) ? data : [data] };
-      }
-      if (ext === 'txt') {
-        const text = await file.text();
-        return { type: 'text', data: text };
-      }
-      if (ext === 'docx') {
-        if (!window.mammoth) throw new Error('Thư viện mammoth.js chưa sẵn sàng.');
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await window.mammoth.extractRawText({ arrayBuffer });
-        return { type: 'text', data: result.value };
-      }
-      throw new Error('Chỉ hỗ trợ file .docx, .txt, hoặc .json');
-    }
-
-    // Gọi Cloudflare Pages Function tại /api/process (hỗ trợ cả text lẫn ảnh)
-    async function processWithAI({ text = '', imageBase64 = null, mimeType = null }) {
-      const response = await fetch('/api/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, imageBase64, mimeType })
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || `Lỗi máy chủ (${response.status})`);
-      }
-
-      return await response.json();
-    }
-
-    function App() {
-      const [questions, setQuestions] = useState(() => load(STORAGE_KEYS.questions, SAMPLE_QUESTIONS));
-      const [attempts, setAttempts] = useState(() => load(STORAGE_KEYS.attempts, []));
+  <!-- Header -->
+  <header class="border-b border-gray-800/80 bg-gray-900/40 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('import-view')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-graduation-cap text-white text-lg"></i>
+        </div>
+        <div>
+          <span class="font-extrabold text-xl tracking-tight text-white">Quiz<span class="text-indigo-400">Bank</span></span>
+          <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Offline Core</span>
+        </div>
+      </div>
       
-      const [examQuestionIds, setExamQuestionIds] = useState(() => load(STORAGE_KEYS.examIds, null));
-      const [examChunks, setExamChunks] = useState(() => load(STORAGE_KEYS.examChunks, []));
-      const [currentChunkIndex, setCurrentChunkIndex] = useState(() => load(STORAGE_KEYS.currentChunkIndex, 0));
-      
-      const [randomCount, setRandomCount] = useState(40);
-      const [chunkSize, setChunkSize] = useState(40);
-      
-      const [instantMode, setInstantMode] = useState(() => load(STORAGE_KEYS.instantMode, false)); 
-      const [activeInstantMode, setActiveInstantMode] = useState(() => load(STORAGE_KEYS.activeInstantMode, false)); 
-      
-      const [mode, setMode] = useState('exam');
-      const [answers, setAnswers] = useState({});
-      const [flags, setFlags] = useState({});
-      const [submitted, setSubmitted] = useState(false);
-      const [current, setCurrent] = useState(0);
-      const [wrongOnly, setWrongOnly] = useState(false);
-      
-      const [bulk, setBulk] = useState('');
-      const [form, setForm] = useState({ q: '', A: '', B: '', C: '', D: '', answer: 'A', explain: '' });
-      const [selectedIds, setSelectedIds] = useState(new Set());
-      
-      const [exportData, setExportData] = useState(null);
+      <div id="quiz-header-meta" class="hidden items-center space-x-4">
+        <div class="flex items-center px-3 py-1.5 rounded-lg bg-gray-800/80 border border-gray-700/60 text-sm font-semibold text-gray-300">
+          <i class="fa-regular fa-clock mr-2 text-indigo-400"></i>
+          <span id="timer-display">00:00</span>
+        </div>
+        <button onclick="confirmSubmitQuiz()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all shadow-md shadow-emerald-600/20">
+          Nộp bài
+        </button>
+      </div>
+    </div>
+  </header>
 
-      // State cho Image OCR & AI Loading
-      const [selectedImage, setSelectedImage] = useState(null); // { file, previewUrl, base64, mimeType }
-      const [isAiLoading, setIsAiLoading] = useState(false);
-      const [statusText, setStatusText] = useState('');
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
 
-      // Lắng nghe sự kiện paste (Ctrl + V) ảnh chụp màn hình trực tiếp
-      useEffect(() => {
-        function handlePaste(e) {
-          if (mode !== 'bank') return;
-          const items = e.clipboardData?.items;
-          if (!items) return;
+    <!-- ================= VIEW 1: IMPORT & UPLOAD ================= -->
+    <div id="import-view" class="space-y-8 max-w-4xl mx-auto">
+      <div class="text-center space-y-3">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          Ngân Hàng Đề Thi Trắc Nghiệm
+        </h1>
+        <p class="text-gray-400 max-w-xl mx-auto text-sm sm:text-base">
+          Tải lên nhiều tệp tin hoặc dán nội dung văn bản để hệ thống tự động bóc tách câu hỏi và tạo phòng thi trắc nghiệm ngay lập tức.
+        </p>
+      </div>
 
-          for (const item of items) {
-            if (item.type.startsWith('image/')) {
-              const file = item.getAsFile();
-              if (file) {
-                fileToBase64(file).then(({ base64, mimeType }) => {
-                  setSelectedImage({
-                    file,
-                    previewUrl: URL.createObjectURL(file),
-                    base64,
-                    mimeType
-                  });
-                });
-                break;
-              }
-            }
-          }
-        }
+      <!-- Khu vực Upload File Hàng Loạt -->
+      <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 sm:p-8 backdrop-blur-sm shadow-xl">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold text-white flex items-center">
+            <i class="fa-solid fa-folder-open text-indigo-400 mr-2.5"></i>
+            Tải lên tệp đề thi (Hàng loạt)
+          </h2>
+          <span class="text-xs text-gray-400 font-medium">Hỗ trợ: .txt, .docx, .json, .csv</span>
+        </div>
 
-        window.addEventListener('paste', handlePaste);
-        return () => window.removeEventListener('paste', handlePaste);
-      }, [mode]);
+        <div id="drop-zone" class="border-2 border-dashed border-gray-700 hover:border-indigo-500/80 bg-gray-950/40 rounded-xl p-8 text-center cursor-pointer transition-all">
+          <input type="file" id="file-input" multiple accept=".txt,.docx,.json,.csv" class="hidden">
+          <div class="w-14 h-14 mx-auto rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-2xl mb-3">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <p class="text-white font-medium text-base mb-1">Kéo & thả nhiều tệp vào đây, hoặc <span class="text-indigo-400 underline underline-offset-2">chọn từ thiết bị</span></p>
+          <p class="text-xs text-gray-500">Hỗ trợ cùng lúc nhiều file Word (.docx), tệp văn bản (.txt) hoặc JSON ngân hàng đề</p>
+        </div>
 
-      const activeQuestions = useMemo(() => {
-        if (!examQuestionIds) return questions;
-        return examQuestionIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
-      }, [examQuestionIds, questions]);
+        <!-- Danh sách file đã chọn -->
+        <div id="file-list-box" class="mt-4 hidden space-y-2">
+          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex justify-between">
+            <span>Danh sách file nạp (<span id="file-count">0</span>):</span>
+            <button onclick="clearFiles()" class="text-rose-400 hover:underline lowercase font-normal">Xóa tất cả</button>
+          </div>
+          <div id="file-items" class="max-h-40 overflow-y-auto space-y-2 custom-scroll pr-1"></div>
+        </div>
+      </div>
 
-      const filtered = useMemo(() => activeQuestions.map((_, i) => i).filter(i => {
-        const q = activeQuestions[i];
-        const isAnswered = answers[i] !== undefined;
-        const showResult = submitted || (activeInstantMode && isAnswered);
-        const okWrong = !wrongOnly || (showResult && answers[i] !== q.answer);
-        return okWrong;
-      }), [activeQuestions, wrongOnly, submitted, answers, activeInstantMode]);
+      <!-- Khu vực Nhập Văn Bản Trực Tiếp -->
+      <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 sm:p-8 backdrop-blur-sm shadow-xl space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-white flex items-center">
+            <i class="fa-solid fa-paste text-indigo-400 mr-2.5"></i>
+            Hoặc dán trực tiếp nội dung đề thi
+          </h2>
+          <button onclick="insertSampleText()" class="text-xs text-indigo-400 hover:underline">
+            Chèn đề mẫu
+          </button>
+        </div>
 
-      const pos = Math.min(current, Math.max(filtered.length - 1, 0));
-      const index = filtered[pos] ?? 0;
-      const item = activeQuestions[index];
-      const answeredCount = Object.keys(answers).length;
-      const score = activeQuestions.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
-      const examTotal = activeQuestions.length;
+        <div class="relative">
+          <textarea id="raw-text-input" rows="8" class="w-full bg-gray-950/60 border border-gray-800 rounded-xl p-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 font-mono custom-scroll transition-colors" placeholder="Câu 1: Thủ đô của Việt Nam là gì?
+*A. Hà Nội
+B. TP. Hồ Chí Minh
+C. Đà Nẵng
+D. Cần Thơ
+Giải thích: Hà Nội là thủ đô của nước CHXHCN Việt Nam.
 
-      const hasAnsweredCurrent = answers[index] !== undefined;
-      const showCurrentResult = submitted || (activeInstantMode && hasAnsweredCurrent);
+Câu 2: ..."></textarea>
+        </div>
 
-      function persistQuestions(next) { setQuestions(next); save(STORAGE_KEYS.questions, next); }
-      function persistAttempts(next) { setAttempts(next); save(STORAGE_KEYS.attempts, next); }
-      
-      function resetExam() { setAnswers({}); setFlags({}); setSubmitted(false); setCurrent(0); setWrongOnly(false); }
-      
-      function shuffleCurrentExam() {
-        const ids = shuffle(activeQuestions).map(q => q.id);
-        setExamQuestionIds(ids);
-        save(STORAGE_KEYS.examIds, ids);
-        resetExam();
-      }
+        <div class="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
+          <span><i class="fa-solid fa-circle-info mr-1 text-gray-400"></i> Mẹo: Thêm dấu <b>*</b> trước đáp án đúng (ví dụ: <code>*A. Hà Nội</code>)</span>
+          <span>Thêm dòng <code>Giải thích: ...</code> để tạo phần hướng dẫn giải</span>
+        </div>
+      </div>
 
-      function generateRandomExam(n) {
-        if (questions.length === 0) return;
-        const validN = Math.min(Math.max(1, n), questions.length);
-        const ids = shuffle(questions).slice(0, validN).map(q => q.id);
+      <!-- Nút phân tích và bắt đầu -->
+      <div class="flex justify-center pt-2">
+        <button onclick="processAndStartQuiz()" class="w-full sm:w-auto px-10 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-base shadow-xl shadow-indigo-600/25 transition-all transform hover:-translate-y-0.5 flex items-center justify-center">
+          <i class="fa-solid fa-play mr-2.5"></i> Bắt đầu thi trắc nghiệm
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= VIEW 2: QUIZ TESTING ================= -->
+    <div id="quiz-view" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         
-        setExamQuestionIds(ids);
-        save(STORAGE_KEYS.examIds, ids);
-        
-        setExamChunks([]);
-        save(STORAGE_KEYS.examChunks, []);
-        
-        setActiveInstantMode(instantMode);
-        save(STORAGE_KEYS.activeInstantMode, instantMode);
-        
-        resetExam();
-      }
-
-      function splitExams(size) {
-        if (questions.length === 0) return alert('Ngân hàng chưa có câu hỏi nào!');
-        if (size < 1) return;
-        
-        const shuffled = shuffle(questions).map(q => q.id);
-        const chunks = [];
-        for (let i = 0; i < shuffled.length; i += size) {
-          chunks.push(shuffled.slice(i, i + size));
-        }
-        
-        setExamChunks(chunks);
-        save(STORAGE_KEYS.examChunks, chunks);
-        
-        setActiveInstantMode(instantMode);
-        save(STORAGE_KEYS.activeInstantMode, instantMode);
-        
-        selectChunk(0, chunks);
-      }
-
-      function selectChunk(idx, chunksToUse = examChunks) {
-        setCurrentChunkIndex(idx);
-        save(STORAGE_KEYS.currentChunkIndex, idx);
-        setExamQuestionIds(chunksToUse[idx]);
-        save(STORAGE_KEYS.examIds, chunksToUse[idx]);
-        resetExam();
-      }
-
-      function useAllQuestions() {
-        setExamQuestionIds(null);
-        save(STORAGE_KEYS.examIds, null);
-        
-        setExamChunks([]);
-        save(STORAGE_KEYS.examChunks, []);
-        
-        setActiveInstantMode(true);
-        save(STORAGE_KEYS.activeInstantMode, true);
-        
-        resetExam();
-      }
-
-      function submitExam() {
-        setSubmitted(true);
-        const attempt = {
-          id: crypto.randomUUID(), date: new Date().toLocaleString('vi-VN'),
-          score, total: examTotal, point10: (score / Math.max(examTotal, 1) * 10).toFixed(2),
-          answers, flags
-        };
-        persistAttempts([attempt, ...attempts].slice(0, 30));
-      }
-
-      function addQuestion(e) {
-        e.preventDefault();
-        const next = [...questions, {
-          id: crypto.randomUUID(), q: form.q,
-          options: [form.A, form.B, form.C, form.D], answer: LETTERS.indexOf(form.answer), explain: form.explain
-        }];
-        persistQuestions(next);
-        setForm({ q: '', A: '', B: '', C: '', D: '', answer: 'A', explain: '' });
-      }
-
-      function addBulk() {
-        const parsed = parseBulk(bulk);
-        if (!parsed.length) return alert('Chưa tách được câu hỏi theo mẫu chuẩn.');
-        persistQuestions([...questions, ...parsed]);
-        setBulk('');
-        alert(`Đã thêm ${parsed.length} câu hỏi.`);
-      }
-
-      // Xử lý gửi văn bản thô cho AI
-      async function handleProcessBulkWithAI() {
-        if (!bulk.trim()) return alert('Vui lòng dán văn bản câu hỏi vào khung.');
-
-        try {
-          setIsAiLoading(true);
-          setStatusText('AI đang đọc đề và chuẩn hóa câu hỏi...');
-          const aiQuestions = await processWithAI({ text: bulk });
-          const formatted = aiQuestions.map(item => ({
-            ...item,
-            id: crypto.randomUUID(),
-            options: (item.options || []).slice(0, 4)
-          }));
-          persistQuestions([...questions, ...formatted]);
-          setBulk('');
-          alert(`Thành công! AI đã trích xuất ${formatted.length} câu hỏi.`);
-        } catch (err) {
-          alert('Lỗi AI: ' + err.message);
-        } finally {
-          setIsAiLoading(false);
-          setStatusText('');
-        }
-      }
-
-      // Xử lý nạp file tài liệu (.docx, .txt, .json)
-      async function handleFileUpload(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-          setStatusText('Đang nạp file...');
-          const extracted = await extractTextFromFile(file);
-
-          if (extracted.type === 'json') {
-            const newItems = extracted.data.map(item => ({
-              id: crypto.randomUUID(),
-              q: item.q || '',
-              options: Array.isArray(item.options) ? item.options.slice(0, 4) : ['','','',''],
-              answer: Number(item.answer) || 0,
-              explain: item.explain || ''
-            }));
-            persistQuestions([...questions, ...newItems]);
-            alert(`Đã nhập ${newItems.length} câu từ file JSON!`);
-            return;
-          }
-
-          setIsAiLoading(true);
-          setStatusText('AI đang đọc file văn bản & suy luận đáp án...');
-          const aiQuestions = await processWithAI({ text: extracted.data });
-          const formatted = aiQuestions.map(item => ({
-            ...item,
-            id: crypto.randomUUID(),
-            options: (item.options || []).slice(0, 4)
-          }));
-          persistQuestions([...questions, ...formatted]);
-          alert(`AI đã thêm thành công ${formatted.length} câu hỏi!`);
-        } catch (err) {
-          alert('Lỗi: ' + err.message);
-        } finally {
-          setIsAiLoading(false);
-          setStatusText('');
-          e.target.value = '';
-        }
-      }
-
-      // Chọn file ảnh
-      async function handleImageSelect(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        try {
-          const { base64, mimeType } = await fileToBase64(file);
-          setSelectedImage({
-            file,
-            previewUrl: URL.createObjectURL(file),
-            base64,
-            mimeType
-          });
-        } catch (err) {
-          alert('Không thể đọc ảnh: ' + err.message);
-        }
-      }
-
-      // Gửi hình ảnh cho AI phân tích
-      async function handleProcessImageWithAI() {
-        if (!selectedImage) return;
-
-        try {
-          setIsAiLoading(true);
-          setStatusText('AI đang nhận diện chữ (OCR) trong ảnh và giải đề...');
-          const aiQuestions = await processWithAI({
-            imageBase64: selectedImage.base64,
-            mimeType: selectedImage.mimeType
-          });
-
-          const formatted = aiQuestions.map(item => ({
-            ...item,
-            id: crypto.randomUUID(),
-            options: (item.options || []).slice(0, 4)
-          }));
-
-          persistQuestions([...questions, ...formatted]);
-          setSelectedImage(null);
-          alert(`Thành công! AI đã nhận diện và thêm ${formatted.length} câu hỏi từ ảnh.`);
-        } catch (err) {
-          alert('Lỗi xử lý ảnh: ' + err.message);
-        } finally {
-          setIsAiLoading(false);
-          setStatusText('');
-        }
-      }
-
-      function toggleSelect(id) {
-        const next = new Set(selectedIds);
-        if (next.has(id)) next.delete(id); else next.add(id);
-        setSelectedIds(next);
-      }
-
-      function toggleSelectAll() {
-        if (selectedIds.size === questions.length) {
-          setSelectedIds(new Set());
-        } else {
-          setSelectedIds(new Set(questions.map(q => q.id)));
-        }
-      }
-
-      function deleteSelected() {
-        if (!selectedIds.size) return;
-        if (!confirm(`Xóa ${selectedIds.size} câu hỏi đã chọn?`)) return;
-        persistQuestions(questions.filter(q => !selectedIds.has(q.id)));
-        setSelectedIds(new Set());
-        resetExam();
-      }
-
-      function deleteAllQuestions() {
-        if (!questions.length) return;
-        if (!confirm('CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ câu hỏi trong ngân hàng?')) return;
-        persistQuestions([]);
-        setSelectedIds(new Set());
-        resetExam();
-      }
-
-      function deleteAttempt(id) {
-        if (!confirm('Xóa kết quả bài thi này?')) return;
-        persistAttempts(attempts.filter(a => a.id !== id));
-      }
-
-      function deleteAllAttempts() {
-        if (!attempts.length) return;
-        if (!confirm('Xóa TẤT CẢ lịch sử bài làm?')) return;
-        persistAttempts([]);
-      }
-
-      function handleDownload() {
-        if (!exportData) return;
-        const blob = new Blob([exportData], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'export-cau-hoi.txt';
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-
-      return (
-        <div className="app">
-          {/* MODAL EXPORT DỮ LIỆU */}
-          {exportData !== null && (
-            <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setExportData(null); }}>
-              <div className="modal-content">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ margin: 0 }}>Xuất dữ liệu</h2>
-                  <button onClick={() => setExportData(null)} style={{ background: 'transparent', border: 0 }}><Icon name="x" size={24}/></button>
-                </div>
-                <textarea readOnly value={exportData} />
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                  <button className="primary" onClick={() => { 
-                    navigator.clipboard.writeText(exportData); 
-                    alert('Đã copy toàn bộ nội dung vào bộ nhớ tạm!'); 
-                  }}>
-                    <Icon name="copy" size={16}/> Copy toàn bộ
-                  </button>
-                  <button onClick={handleDownload}>
-                    <Icon name="download" size={16}/> Tải file .txt (Mở bằng Word)
-                  </button>
-                </div>
-              </div>
+        <!-- Câu hỏi chính -->
+        <div class="lg:col-span-3 space-y-6">
+          <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 sm:p-8 backdrop-blur-sm shadow-xl">
+            <!-- Header câu hỏi -->
+            <div class="flex items-center justify-between border-b border-gray-800 pb-4 mb-6">
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-400 px-3 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20">
+                Câu hỏi <span id="current-q-num">1</span> / <span id="total-q-num">0</span>
+              </span>
+              <button id="flag-btn" onclick="toggleFlagCurrentQuestion()" class="text-xs flex items-center text-gray-400 hover:text-amber-400 transition-colors">
+                <i class="fa-regular fa-bookmark mr-1.5 text-sm"></i> Đánh dấu xem lại
+              </button>
             </div>
-          )}
 
-          <div className="shell">
-            <header className="hero">
-              <div>
-                <p className="eyebrow">QUIZ BANK - CILLTECH</p>
-                <h1>Website luyện trắc nghiệm</h1>
-              </div>
-              <div className="stats-container">
-                <div className="stat-full">
-                  <b>{questions.length}</b> <span>câu trong ngân hàng đề</span>
-                </div>
-                <div className="stats">
-                  <div><b>{activeQuestions.length}</b><span>câu hỏi</span></div>
-                  <div><b>{answeredCount}</b><span>đã chọn</span></div>
-                  <div><b>{submitted ? score : '—'}</b><span>câu đúng</span></div>
-                  <div><b>{submitted ? (score / Math.max(examTotal, 1) * 10).toFixed(2) : '—'}</b><span>điểm 10</span></div>
-                </div>
-              </div>
-            </header>
+            <!-- Nội dung đề -->
+            <div id="question-text" class="text-lg sm:text-xl font-semibold text-white leading-relaxed mb-6">
+              <!-- Nội dung câu hỏi -->
+            </div>
 
-            <nav className="tabs">
-              <button className={mode === 'exam' ? 'active' : ''} onClick={() => setMode('exam')}><Icon name="book-open"/> Làm bài</button>
-              <button className={mode === 'bank' ? 'active' : ''} onClick={() => setMode('bank')}><Icon name="database"/> Ngân hàng câu hỏi</button>
-              <button className={mode === 'history' ? 'active' : ''} onClick={() => setMode('history')}><Icon name="history"/> Lịch sử thi</button>
-            </nav>
+            <!-- Danh sách lựa chọn -->
+            <div id="options-container" class="space-y-3">
+              <!-- Các lựa chọn A, B, C, D render động -->
+            </div>
+          </div>
 
-            {mode === 'exam' && (
-              <section className="layout">
-                <aside className="panel side">
-                  <div className="two">
-                    <button onClick={() => setCurrent(c => Math.max(0, c - 1))}>Trước</button>
-                    <button onClick={() => setCurrent(c => Math.min(filtered.length - 1, c + 1))}>Sau</button>
-                  </div>
-                  <button disabled={!item} onClick={() => setFlags(f => ({...f, [index]: !f[index]}))} className={flags[index] ? 'warn' : ''}>
-                    <Icon name="flag" size={17}/> {flags[index] ? 'Đã cắm cờ' : 'Cắm cờ câu này'}
-                  </button>
-                  <button disabled={!submitted && !activeInstantMode} onClick={() => { setWrongOnly(v => !v); setCurrent(0); }}>
-                    {wrongOnly ? 'Hiện tất cả' : 'Chỉ xem câu sai'}
-                  </button>
-                  <button onClick={submitExam} disabled={submitted || activeQuestions.length === 0} className="primary"><Icon name="check-circle-2" size={17}/> Nộp & lưu bài</button>
-                  <button onClick={resetExam}><Icon name="rotate-ccw" size={17}/> Làm lại bài này</button>
-                  <button onClick={shuffleCurrentExam}>Trộn thứ tự đề</button>
-
-                  <hr style={{ border: 0, borderTop: '1px solid #44403c', margin: '18px 0' }} />
-                  
-                  <label style={{ marginTop: 0, textAlign: 'center' }}>Chế độ & Tạo đề</label>
-                  
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', justifyContent: 'center' }}>
-                    <label className="switch" title="Chế độ khi tạo đề">
-                      <input type="checkbox" checked={instantMode} onChange={e => {
-                        setInstantMode(e.target.checked);
-                        save(STORAGE_KEYS.instantMode, e.target.checked);
-                      }} />
-                      <span className="slider"></span>
-                    </label>
-                    <span style={{ fontSize: '12px', color: '#a8a29e' }}>
-                      {instantMode ? 'Tạo đề: Hiện đáp án ngay' : 'Tạo đề: Nộp mới hiện đáp án'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <input type="number" min="1" max={questions.length} value={randomCount} onChange={e => setRandomCount(e.target.value)} style={{ width: '70px', padding: '11px' }} title="Số câu" />
-                    <button onClick={() => generateRandomExam(Number(randomCount))} style={{ flex: 1 }}>Ngẫu nhiên 1 đề</button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <input type="number" min="1" max={questions.length} value={chunkSize} onChange={e => setChunkSize(e.target.value)} style={{ width: '70px', padding: '11px' }} title="Số câu mỗi đề" />
-                    <button onClick={() => splitExams(Number(chunkSize))} className="primary" style={{ flex: 1 }}>Chia đều ngân hàng</button>
-                  </div>
-
-                  {examChunks.length > 0 && (
-                    <div style={{ background: '#1c1917', border: '1px solid #44403c', borderRadius: '14px', padding: '12px', marginBottom: '8px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                        {examChunks.map((chunk, i) => (
-                          <button 
-                            key={i} 
-                            onClick={() => selectChunk(i)}
-                            style={{ 
-                              padding: '6px 0', 
-                              fontSize: '12px',
-                              background: i === currentChunkIndex ? '#fb923c' : '#292524',
-                              color: i === currentChunkIndex ? '#1c1917' : '#f5f5f4',
-                              borderColor: i === currentChunkIndex ? '#fb923c' : '#44403c',
-                              margin: 0
-                            }}
-                          >
-                            Đề {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <button onClick={() => setExportData(generateExportText(activeQuestions))} style={{ marginBottom: '8px' }}>
-                    <Icon name="file-text" size={16}/> Xuất đề hiện tại
-                  </button>
-
-                  <button onClick={useAllQuestions}>Làm toàn bộ {questions.length} câu</button>
-
-                  <div className="gridBtns">
-                    {filtered.map((idx, p) => {
-                      const picked = answers[idx] !== undefined;
-                      const showResultForThis = submitted || (activeInstantMode && picked);
-                      const good = showResultForThis && answers[idx] === activeQuestions[idx].answer;
-                      const bad = showResultForThis && answers[idx] !== activeQuestions[idx].answer;
-                      
-                      return (
-                        <button key={idx} onClick={() => setCurrent(p)} className={`${idx === index ? 'now' : ''} ${good ? 'good' : bad ? 'bad' : picked ? 'picked' : ''}`}>
-                          {flags[idx] ? '🚩' : idx + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </aside>
-
-                <main className="panel main">
-                  {!item ? <div className="empty">Không có câu hỏi trong đề. Hãy thêm câu hỏi vào ngân hàng.</div> : (
-                    <>
-                      <div className="chips"><span>Câu {index + 1}/{activeQuestions.length}</span>{flags[index] && <span>🚩 Chưa chắc chắn</span>}</div>
-                      <h2>{item.q}</h2>
-                      <div className="options">
-                        {item.options.map((op, i) => {
-                          const picked = answers[index] === i;
-                          const correct = showCurrentResult && i === item.answer;
-                          const wrong = showCurrentResult && picked && i !== item.answer;
-                          return (
-                            <button key={i} 
-                              onClick={() => {
-                                if (!submitted && !(activeInstantMode && hasAnsweredCurrent)) {
-                                  setAnswers(a => ({...a, [index]: i}))
-                                }
-                              }} 
-                              className={`${picked ? 'picked' : ''} ${correct ? 'correct' : ''} ${wrong ? 'wrong' : ''}`}>
-                              <b>{LETTERS[i]}.</b> {op}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {showCurrentResult && (
-                        <div className={answers[index] === item.answer ? 'explain ok' : 'explain no'}>
-                          <b>{answers[index] === item.answer ? 'Đúng ✅' : `Sai · Đáp án đúng: ${LETTERS[item.answer]} ✅`}</b>
-                          <p>{item.explain || 'Chưa có giải thích.'}</p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </main>
-              </section>
-            )}
-
-            {mode === 'bank' && (
-              <section className="bank-layout">
-                {/* BẢNG TẢI FILE & NHẬN DIỆN HÌNH ẢNH */}
-                <div className="panel form" style={{ border: '1px solid #78350f' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                    <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Icon name="sparkles" size={22}/> Nhập Đề Tự Động (Hỗ trợ File Word, Text & Hình ảnh)
-                    </h2>
-                    <span className="ai-badge">Gemini OCR & Solver</span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginTop: '10px' }}>
-                    {/* Cột 1: Tải file Word/Text */}
-                    <div>
-                      <label style={{ marginTop: 0 }}><Icon name="file-text" size={16}/> Tệp văn bản (.docx, .txt, .json):</label>
-                      <input 
-                        type="file" 
-                        accept=".docx,.txt,.json" 
-                        onChange={handleFileUpload} 
-                        disabled={isAiLoading}
-                        style={{ padding: '9px', background: '#0c0a09' }}
-                      />
-                      <small style={{ color: '#a8a29e', display: 'block', marginTop: '6px', fontSize: '12px' }}>
-                        * AI sẽ đọc nội dung, tự phân tách câu hỏi và bổ sung đáp án.
-                      </small>
-                    </div>
-
-                    {/* Cột 2: Tải ảnh hoặc dán ảnh chụp màn hình */}
-                    <div>
-                      <label style={{ marginTop: 0 }}><Icon name="image" size={16}/> Ảnh đề thi (.png, .jpg, .webp) hoặc bấm Ctrl + V:</label>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleImageSelect} 
-                        disabled={isAiLoading}
-                        style={{ padding: '9px', background: '#0c0a09' }}
-                      />
-                      
-                      {selectedImage && (
-                        <div className="img-preview-box">
-                          <img src={selectedImage.previewUrl} alt="Preview" />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700 }}>Ảnh đã chọn</div>
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                              <button className="primary" onClick={handleProcessImageWithAI} disabled={isAiLoading} style={{ padding: '6px 12px', fontSize: '12px' }}>
-                                <Icon name="sparkles" size={14}/> Đọc & Giải Ảnh
-                              </button>
-                              <button onClick={() => setSelectedImage(null)} disabled={isAiLoading} style={{ padding: '6px 12px', fontSize: '12px' }}>
-                                Bỏ chọn
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <small style={{ color: '#a8a29e', display: 'block', marginTop: '6px', fontSize: '12px' }}>
-                        * Bạn có thể chụp màn hình câu hỏi rồi nhấn <b>Ctrl + V</b> trực tiếp tại đây.
-                      </small>
-                    </div>
-                  </div>
-
-                  {isAiLoading && (
-                    <div style={{ marginTop: '10px', padding: '12px', background: '#292524', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="pulse" style={{ color: '#fb923c', fontWeight: 800 }}>⏳ {statusText}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-col">
-                  <form className="panel form" onSubmit={addQuestion}>
-                    <h2>Thêm 1 câu hỏi thủ công</h2>
-                    <textarea required placeholder="Nội dung câu hỏi" value={form.q} onChange={e => setForm({...form, q: e.target.value})}/>
-                    {LETTERS.map(l => <input type="text" key={l} required placeholder={`Đáp án ${l}`} value={form[l]} onChange={e => setForm({...form, [l]: e.target.value})}/>) }
-                    <select value={form.answer} onChange={e => setForm({...form, answer: e.target.value})}>
-                      {LETTERS.map(l => <option key={l} value={l}>Đáp án đúng: {l}</option>)}
-                    </select>
-                    <textarea placeholder="Giải thích đáp án (không bắt buộc)" value={form.explain} onChange={e => setForm({...form, explain: e.target.value})}/>
-                    <button className="primary"><Icon name="plus" size={17}/> Thêm vào ngân hàng</button>
-                  </form>
-
-                  <div className="panel form">
-                    <h2>Dán nội dung hàng loạt</h2>
-                    <textarea 
-                      className="bulk" 
-                      value={bulk} 
-                      onChange={e => setBulk(e.target.value)} 
-                      placeholder={`Có thể dán văn bản chuẩn mẫu hoặc văn bản thô bất kỳ:\n\n1/ Vấn đề cơ bản của triết học là gì?\nA. Tư duy và tồn tại\nB. Con người và tự nhiên\nC. Vật chất và ý thức\nD. Xã hội và lịch sử\n\n(Không cần đúng mẫu, AI sẽ tự phân tích)`}
-                    />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <button onClick={addBulk} disabled={isAiLoading}>
-                        <Icon name="upload" size={17}/> Thêm chuẩn mẫu
-                      </button>
-                      <button onClick={handleProcessBulkWithAI} className="primary" disabled={isAiLoading || !bulk.trim()}>
-                        <Icon name="sparkles" size={17}/> AI Chuẩn Hóa & Giải
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="panel">
-                  <div className="list-header">
-                    <h2>Danh sách ({questions.length})</h2>
-                    <div className="list-actions">
-                      <button onClick={() => setExportData(generateExportText(questions))}>
-                        <Icon name="file-text" size={16}/> Xuất ngân hàng
-                      </button>
-                      <button onClick={toggleSelectAll}>
-                        <Icon name={selectedIds.size === questions.length && questions.length > 0 ? "check-square" : "square"} size={16}/> Chọn tất cả
-                      </button>
-                      <button onClick={deleteSelected} disabled={selectedIds.size === 0} className="warn">
-                        <Icon name="trash" size={16}/> Xóa ({selectedIds.size})
-                      </button>
-                      <button onClick={deleteAllQuestions} disabled={questions.length === 0} className="danger">
-                        <Icon name="trash-2" size={16}/> Xóa hết
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {questions.length === 0 ? (
-                    <div className="empty">Ngân hàng trống.</div>
-                  ) : (
-                    <div className="bankList">
-                      {questions.map((q, i) => (
-                        <div className={`bankItem ${selectedIds.has(q.id) ? 'selected' : ''}`} key={q.id}>
-                          <input 
-                            type="checkbox" 
-                            checked={selectedIds.has(q.id)} 
-                            onChange={() => toggleSelect(q.id)} 
-                          />
-                          <div className="bankItem-content">
-                            <b>{i + 1}. {q.q}</b>
-                            <p>Đáp án: {LETTERS[q.answer]}</p>
-                          </div>
-                          <button onClick={() => {
-                             if (confirm('Xóa câu hỏi này?')) persistQuestions(questions.filter(item => item.id !== q.id));
-                          }}><Icon name="x" size={16}/></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {mode === 'history' && (
-              <section className="panel">
-                <div className="history-header">
-                  <h2>Bài thi đã lưu</h2>
-                  <button onClick={deleteAllAttempts} disabled={attempts.length === 0} className="danger">
-                    <Icon name="trash-2" size={16}/> Xóa toàn bộ lịch sử
-                  </button>
-                </div>
-                {!attempts.length && <p className="hint empty">Chưa có bài nào. Khi bấm “Nộp & lưu bài”, kết quả sẽ nằm ở đây.</p>}
-                <div className="history">
-                  {attempts.map(a => (
-                    <article key={a.id}>
-                      <div className="history-info">
-                        <b>{a.date}</b>
-                        <p>Điểm: {a.score}/{a.total} · {a.point10}/10 · Cắm cờ: {Object.values(a.flags || {}).filter(Boolean).length} câu</p>
-                      </div>
-                      <button onClick={() => deleteAttempt(a.id)} className="warn"><Icon name="trash" size={16}/></button>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
+          <!-- Điều hướng Trước / Sau -->
+          <div class="flex items-center justify-between">
+            <button id="prev-btn" onclick="navigateQuestion(-1)" class="px-5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <i class="fa-solid fa-arrow-left mr-2"></i> Câu trước
+            </button>
+            <div class="text-xs text-gray-500 font-medium">
+              Đã làm: <span id="answered-count" class="text-gray-300 font-bold">0</span>/<span id="total-answered-q">0</span>
+            </div>
+            <button id="next-btn" onclick="navigateQuestion(1)" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              Câu kế tiếp <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
           </div>
         </div>
-      );
+
+        <!-- Bảng Ma Trận Câu Hỏi (Palette) -->
+        <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur-sm shadow-xl sticky top-24">
+          <h3 class="text-sm font-bold text-gray-200 mb-3 flex items-center justify-between">
+            <span>Danh mục câu hỏi</span>
+            <span id="progress-percent" class="text-xs text-indigo-400 font-bold">0%</span>
+          </h3>
+
+          <div class="w-full bg-gray-800 h-1.5 rounded-full mb-4 overflow-hidden">
+            <div id="progress-bar" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
+          </div>
+
+          <div id="palette-grid" class="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto custom-scroll pr-1">
+            <!-- Nút câu hỏi tạo động -->
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-gray-800 text-[11px] text-gray-400 space-y-1.5">
+            <div class="flex items-center"><span class="w-3 h-3 rounded bg-indigo-600 mr-2"></span> Đang xem</div>
+            <div class="flex items-center"><span class="w-3 h-3 rounded bg-emerald-600 mr-2"></span> Đã chọn đáp án</div>
+            <div class="flex items-center"><span class="w-3 h-3 rounded bg-amber-500/20 border border-amber-500 mr-2"></span> Đã gắn cờ</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= VIEW 3: RESULT & REVIEW ================= -->
+    <div id="result-view" class="hidden space-y-8 max-w-4xl mx-auto">
+      
+      <!-- Thẻ Tổng Kết Điểm -->
+      <div class="bg-gradient-to-b from-gray-900/90 to-gray-950 border border-gray-800 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
+        <div class="absolute inset-0 bg-indigo-500/5 backdrop-blur-3xl -z-10"></div>
+        
+        <h2 class="text-2xl font-bold text-white mb-2">Kết Quả Bài Làm</h2>
+        <p class="text-sm text-gray-400 mb-6">Bạn đã hoàn thành bài thi trắc nghiệm.</p>
+
+        <div class="flex flex-wrap justify-center gap-6 sm:gap-10 my-6">
+          <div class="bg-gray-800/50 border border-gray-700/50 rounded-2xl px-6 py-4 min-w-[130px]">
+            <span class="block text-3xl font-extrabold text-indigo-400" id="res-score">0.0</span>
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Điểm số (Thang 10)</span>
+          </div>
+          <div class="bg-gray-800/50 border border-gray-700/50 rounded-2xl px-6 py-4 min-w-[130px]">
+            <span class="block text-3xl font-extrabold text-emerald-400" id="res-correct">0</span>
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Số câu đúng</span>
+          </div>
+          <div class="bg-gray-800/50 border border-gray-700/50 rounded-2xl px-6 py-4 min-w-[130px]">
+            <span class="block text-3xl font-extrabold text-rose-400" id="res-wrong">0</span>
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Số câu sai</span>
+          </div>
+          <div class="bg-gray-800/50 border border-gray-700/50 rounded-2xl px-6 py-4 min-w-[130px]">
+            <span class="block text-3xl font-extrabold text-gray-300" id="res-time">00:00</span>
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Thời gian</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-3 mt-6">
+          <button onclick="restartSameQuiz()" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-600/20">
+            <i class="fa-solid fa-rotate-right mr-2"></i> Làm lại đề này
+          </button>
+          <button onclick="switchView('import-view')" class="px-6 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold text-sm transition-all border border-gray-700">
+            <i class="fa-solid fa-plus mr-2"></i> Nạp đề mới
+          </button>
+        </div>
+      </div>
+
+      <!-- Danh Sách Chi Tiết Lời Giải -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-bold text-white flex items-center">
+          <i class="fa-solid fa-list-check text-indigo-400 mr-2.5"></i>
+          Chi tiết bài thi & Đáp án
+        </h3>
+        <div id="review-list" class="space-y-4">
+          <!-- Chi tiết từng câu hiển thị động -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-900 bg-gray-950/60 py-6 text-center text-xs text-gray-500">
+    QuizBank Engine &bull; Hoạt động ngoại tuyến &bull; Trích xuất dữ liệu không cần máy chủ
+  </footer>
+
+  <!-- ================= LOGIC JAVASCRIPT THUẦN ================= -->
+  <script>
+    // Trạng thái ứng dụng
+    let quizBank = [];
+    let userAnswers = {};
+    let flaggedQuestions = new Set();
+    let currentQuestionIndex = 0;
+    let timerInterval = null;
+    let timeElapsedSeconds = 0;
+    let selectedFiles = [];
+
+    // Chuyển đổi màn hình
+    function switchView(viewId) {
+      document.getElementById('import-view').classList.add('hidden');
+      document.getElementById('quiz-view').classList.add('hidden');
+      document.getElementById('result-view').classList.add('hidden');
+      document.getElementById('quiz-header-meta').classList.add('hidden');
+
+      document.getElementById(viewId).classList.remove('hidden');
+
+      if (viewId === 'quiz-view') {
+        document.getElementById('quiz-header-meta').classList.remove('hidden');
+        document.getElementById('quiz-header-meta').classList.add('flex');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    // ================= XỬ LÝ UPLOAD FILE HÀNG LOẠT =================
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-indigo-500', 'bg-indigo-500/5');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/5');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/5');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        addFiles(Array.from(e.dataTransfer.files));
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        addFiles(Array.from(e.target.files));
+      }
+    });
+
+    function addFiles(files) {
+      for (let f of files) {
+        // Tránh trùng tên
+        if (!selectedFiles.some(item => item.name === f.name && item.size === f.size)) {
+          selectedFiles.push(f);
+        }
+      }
+      renderFileList();
+    }
+
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      renderFileList();
+    }
+
+    function clearFiles() {
+      selectedFiles = [];
+      fileInput.value = '';
+      renderFileList();
+    }
+
+    function renderFileList() {
+      const box = document.getElementById('file-list-box');
+      const count = document.getElementById('file-count');
+      const container = document.getElementById('file-items');
+
+      if (selectedFiles.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      box.classList.remove('hidden');
+      count.textContent = selectedFiles.length;
+      container.innerHTML = '';
+
+      selectedFiles.forEach((file, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between px-3 py-2 bg-gray-800/60 border border-gray-700/60 rounded-lg text-xs';
+        
+        let iconClass = 'fa-file-lines text-indigo-400';
+        if (file.name.endsWith('.docx')) iconClass = 'fa-file-word text-blue-400';
+        else if (file.name.endsWith('.json')) iconClass = 'fa-file-code text-amber-400';
+        else if (file.name.endsWith('.csv')) iconClass = 'fa-file-csv text-emerald-400';
+
+        item.innerHTML = `
+          <div class="flex items-center space-x-2 truncate">
+            <i class="fa-solid ${iconClass}"></i>
+            <span class="text-gray-200 font-medium truncate">${file.name}</span>
+            <span class="text-gray-500 text-[10px]">(${(file.size / 1024).toFixed(1)} KB)</span>
+          </div>
+          <button onclick="removeFile(${idx})" class="text-gray-500 hover:text-rose-400 transition-colors ml-2">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Đọc nội dung của 1 file cụ thể
+    async function readFileContent(file) {
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+      } else {
+        return await file.text();
+      }
+    }
+
+    // ================= PARSER REGEX THUẦN (CLIENT-SIDE) =================
+    function parseQuizText(rawText) {
+      const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+      const questions = [];
+      let current = null;
+
+      // Nhận diện: Câu 1:, Câu 1., 1., 1/, Question 1:
+      const qStartRegex = /^(?:câu|question|\d+)\s*[\d\.\:\)\-\/]+/i;
+      // Nhận diện: A., A), [A], *A., A.*,...
+      const optRegex = /^(\*?)\s*\(?([A-D])[\.\)]\s*(.*)/i;
+      // Nhận diện giải thích: Giải thích: / Explain:
+      const explainRegex = /^(?:giải\s*thích|lời\s*giải|explain)\s*[\:\-]\s*(.*)/i;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // 1. Kiểm tra nếu là giải thích
+        if (current && explainRegex.test(line)) {
+          const match = line.match(explainRegex);
+          current.explain = match[1] || "";
+          continue;
+        }
+
+        // 2. Kiểm tra nếu là bắt đầu một lựa chọn đáp án
+        const optMatch = line.match(optRegex);
+        if (optMatch && current) {
+          const isMarked = optMatch[1] === '*' || line.includes('*') || line.toLowerCase().includes('(đáp án)');
+          const letter = optMatch[2].toUpperCase();
+          const optionText = optMatch[3].replace(/\*+/g, '').replace(/\(đáp án\)/ig, '').trim();
+          const optIdx = letter.charCodeAt(0) - 65; // A:0, B:1, C:2, D:3
+
+          if (optIdx >= 0 && optIdx < 4) {
+            current.options[optIdx] = optionText;
+            if (isMarked) {
+              current.answer = optIdx;
+            }
+          }
+          continue;
+        }
+
+        // 3. Kiểm tra nếu là bắt đầu một câu hỏi mới
+        if (qStartRegex.test(line)) {
+          if (current && isValidQuestion(current)) {
+            questions.push(finalizeQuestion(current));
+          }
+          current = {
+            q: line.replace(qStartRegex, '').trim(),
+            options: [],
+            answer: 0,
+            explain: ""
+          };
+          continue;
+        }
+
+        // 4. Các dòng tiếp nối câu hỏi hoặc giải thích
+        if (current) {
+          if (current.options.length === 0) {
+            current.q += ' ' + line;
+          } else if (current.explain) {
+            current.explain += ' ' + line;
+          }
+        }
+      }
+
+      // Đẩy câu hỏi cuối cùng
+      if (current && isValidQuestion(current)) {
+        questions.push(finalizeQuestion(current));
+      }
+
+      return questions;
+    }
+
+    function isValidQuestion(q) {
+      return q.q.trim().length > 0 && q.options.filter(Boolean).length >= 2;
+    }
+
+    function finalizeQuestion(q) {
+      return {
+        q: q.q.trim(),
+        options: [
+          q.options[0] || "Lựa chọn A",
+          q.options[1] || "Lựa chọn B",
+          q.options[2] || "Lựa chọn C",
+          q.options[3] || "Lựa chọn D"
+        ],
+        answer: (typeof q.answer === 'number' && q.answer >= 0 && q.answer < 4) ? q.answer : 0,
+        explain: q.explain ? q.explain.trim() : "Chưa có lời giải chi tiết cho câu hỏi này."
+      };
+    }
+
+    // ================= XỬ LÝ DỮ LIỆU ĐẦU VÀO =================
+    async function processAndStartQuiz() {
+      let combinedText = document.getElementById('raw-text-input').value.trim();
+      let extractedQuestions = [];
+
+      // 1. Đọc và gộp toàn bộ file tải lên
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          try {
+            const content = await readFileContent(file);
+            if (file.name.toLowerCase().endsWith('.json')) {
+              try {
+                const parsedJson = JSON.parse(content);
+                if (Array.isArray(parsedJson)) {
+                  extractedQuestions.push(...parsedJson);
+                }
+              } catch (e) {
+                console.warn("Lỗi đọc file JSON:", file.name);
+              }
+            } else {
+              combinedText += '\n\n' + content;
+            }
+          } catch (err) {
+            console.error("Lỗi đọc file:", file.name, err);
+          }
+        }
+      }
+
+      // 2. Parser dữ liệu text
+      if (combinedText.trim()) {
+        const textParsed = parseQuizText(combinedText);
+        extractedQuestions.push(...textParsed);
+      }
+
+      if (extractedQuestions.length === 0) {
+        alert("Không nhận diện được câu hỏi trắc nghiệm nào! Vui lòng tải file hoặc nhập đúng định dạng:\n\nCâu 1: ...\n*A. ...\nB. ...\nC. ...\nD. ...");
+        return;
+      }
+
+      // Nạp ngân hàng câu hỏi và bắt đầu
+      quizBank = extractedQuestions;
+      userAnswers = {};
+      flaggedQuestions.clear();
+      currentQuestionIndex = 0;
+      timeElapsedSeconds = 0;
+
+      startTimer();
+      renderPalette();
+      loadQuestion(0);
+      switchView('quiz-view');
+    }
+
+    // ================= QUIZ LOGIC & VIEW =================
+    function startTimer() {
+      clearInterval(timerInterval);
+      const timerDisplay = document.getElementById('timer-display');
+      timerInterval = setInterval(() => {
+        timeElapsedSeconds++;
+        const mins = Math.floor(timeElapsedSeconds / 60).toString().padStart(2, '0');
+        const secs = (timeElapsedSeconds % 60).toString().padStart(2, '0');
+        timerDisplay.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function loadQuestion(index) {
+      if (index < 0 || index >= quizBank.length) return;
+      currentQuestionIndex = index;
+      const qData = quizBank[index];
+
+      document.getElementById('current-q-num').textContent = index + 1;
+      document.getElementById('total-q-num').textContent = quizBank.length;
+      document.getElementById('question-text').textContent = qData.q;
+
+      // Nút cờ đánh dấu
+      const flagBtn = document.getElementById('flag-btn');
+      if (flaggedQuestions.has(index)) {
+        flagBtn.innerHTML = '<i class="fa-solid fa-bookmark mr-1.5 text-sm text-amber-400"></i> <span class="text-amber-400">Đã đánh dấu</span>';
+      } else {
+        flagBtn.innerHTML = '<i class="fa-regular fa-bookmark mr-1.5 text-sm"></i> Đánh dấu xem lại';
+      }
+
+      // Render options
+      const optContainer = document.getElementById('options-container');
+      optContainer.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+
+      qData.options.forEach((optText, optIdx) => {
+        const isSelected = userAnswers[index] === optIdx;
+        const btn = document.createElement('button');
+        btn.onclick = () => selectOption(index, optIdx);
+        btn.className = `w-full text-left p-4 rounded-xl border transition-all flex items-start space-x-3.5 ${
+          isSelected
+            ? 'bg-indigo-600/15 border-indigo-500 text-white shadow-md shadow-indigo-500/10'
+            : 'bg-gray-950/40 border-gray-800 text-gray-300 hover:border-gray-700 hover:bg-gray-800/40'
+        }`;
+
+        btn.innerHTML = `
+          <span class="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+            isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
+          }">
+            ${letters[optIdx]}
+          </span>
+          <span class="text-sm sm:text-base leading-relaxed pt-0.5">${optText}</span>
+        `;
+        optContainer.appendChild(btn);
+      });
+
+      // Cập nhật nút Trước / Sau
+      document.getElementById('prev-btn').disabled = (index === 0);
+      document.getElementById('next-btn').disabled = (index === quizBank.length - 1);
+
+      updateStats();
+      renderPalette();
+    }
+
+    function selectOption(qIdx, optIdx) {
+      userAnswers[qIdx] = optIdx;
+      loadQuestion(qIdx);
+    }
+
+    function toggleFlagCurrentQuestion() {
+      if (flaggedQuestions.has(currentQuestionIndex)) {
+        flaggedQuestions.delete(currentQuestionIndex);
+      } else {
+        flaggedQuestions.add(currentQuestionIndex);
+      }
+      loadQuestion(currentQuestionIndex);
+    }
+
+    function navigateQuestion(offset) {
+      loadQuestion(currentQuestionIndex + offset);
+    }
+
+    function updateStats() {
+      const answeredCount = Object.keys(userAnswers).length;
+      document.getElementById('answered-count').textContent = answeredCount;
+      document.getElementById('total-answered-q').textContent = quizBank.length;
+
+      const pct = Math.round((answeredCount / quizBank.length) * 100);
+      document.getElementById('progress-percent').textContent = `${pct}%`;
+      document.getElementById('progress-bar').style.width = `${pct}%`;
+    }
+
+    function renderPalette() {
+      const grid = document.getElementById('palette-grid');
+      grid.innerHTML = '';
+
+      quizBank.forEach((_, idx) => {
+        const btn = document.createElement('button');
+        btn.onclick = () => loadQuestion(idx);
+        
+        const isCurrent = idx === currentQuestionIndex;
+        const isAnswered = typeof userAnswers[idx] === 'number';
+        const isFlagged = flaggedQuestions.has(idx);
+
+        let cls = 'h-9 rounded-lg font-bold text-xs transition-all relative ';
+        if (isCurrent) {
+          cls += 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-2 ring-offset-gray-900';
+        } else if (isAnswered) {
+          cls += 'bg-emerald-600/30 border border-emerald-500/60 text-emerald-300';
+        } else {
+          cls += 'bg-gray-800/80 hover:bg-gray-700 border border-gray-700/60 text-gray-400';
+        }
+
+        btn.className = cls;
+        btn.textContent = idx + 1;
+
+        if (isFlagged) {
+          const dot = document.createElement('span');
+          dot.className = 'absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-gray-900';
+          btn.appendChild(dot);
+        }
+
+        grid.appendChild(btn);
+      });
+    }
+
+    // ================= NỘP BÀI & XEM LẠI =================
+    function confirmSubmitQuiz() {
+      const unanswered = quizBank.length - Object.keys(userAnswers).length;
+      let msg = "Bạn có chắc chắn muốn nộp bài?";
+      if (unanswered > 0) {
+        msg = `Bạn còn ${unanswered} câu chưa trả lời. Bạn vẫn muốn nộp bài chứ?`;
+      }
+      if (confirm(msg)) {
+        finishQuiz();
+      }
+    }
+
+    function finishQuiz() {
+      clearInterval(timerInterval);
+
+      let correctCount = 0;
+      quizBank.forEach((q, idx) => {
+        if (userAnswers[idx] === q.answer) {
+          correctCount++;
+        }
+      });
+
+      const wrongCount = quizBank.length - correctCount;
+      const score = ((correctCount / quizBank.length) * 10).toFixed(1);
+
+      document.getElementById('res-score').textContent = score;
+      document.getElementById('res-correct').textContent = correctCount;
+      document.getElementById('res-wrong').textContent = wrongCount;
+
+      const mins = Math.floor(timeElapsedSeconds / 60).toString().padStart(2, '0');
+      const secs = (timeElapsedSeconds % 60).toString().padStart(2, '0');
+      document.getElementById('res-time').textContent = `${mins}:${secs}`;
+
+      renderReview();
+      switchView('result-view');
+    }
+
+    function renderReview() {
+      const container = document.getElementById('review-list');
+      container.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+
+      quizBank.forEach((q, idx) => {
+        const userChoice = userAnswers[idx];
+        const isCorrect = userChoice === q.answer;
+        const item = document.createElement('div');
+        item.className = `p-6 rounded-2xl border ${
+          isCorrect ? 'bg-gray-900/60 border-emerald-500/30' : 'bg-gray-900/60 border-rose-500/30'
+        } space-y-4`;
+
+        let optionsHtml = '';
+        q.options.forEach((optText, optIdx) => {
+          let optStyle = 'border-gray-800 text-gray-400 bg-gray-950/30';
+          let tag = '';
+
+          if (optIdx === q.answer) {
+            optStyle = 'border-emerald-500 bg-emerald-500/10 text-emerald-300 font-semibold';
+            tag = '<span class="ml-auto text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Đáp án đúng</span>';
+          }
+          if (userChoice === optIdx && !isCorrect) {
+            optStyle = 'border-rose-500 bg-rose-500/10 text-rose-300 font-semibold';
+            tag = '<span class="ml-auto text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-400">Bạn đã chọn</span>';
+          }
+
+          optionsHtml += `
+            <div class="flex items-center px-4 py-2.5 rounded-xl border text-sm ${optStyle}">
+              <span class="w-6 font-bold">${letters[optIdx]}.</span>
+              <span>${optText}</span>
+              ${tag}
+            </div>
+          `;
+        });
+
+        item.innerHTML = `
+          <div class="flex items-start justify-between">
+            <span class="text-sm font-bold text-white">Câu ${idx + 1}: ${q.q}</span>
+            <span class="px-2.5 py-1 rounded text-xs font-bold ${
+              isCorrect ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+            }">
+              ${isCorrect ? 'Đúng' : (typeof userChoice === 'number' ? 'Sai' : 'Chưa làm')}
+            </span>
+          </div>
+
+          <div class="space-y-2">
+            ${optionsHtml}
+          </div>
+
+          <div class="pt-3 border-t border-gray-800 text-xs text-gray-400 leading-relaxed">
+            <span class="font-bold text-indigo-400"><i class="fa-solid fa-lightbulb mr-1"></i> Lời giải:</span> ${q.explain}
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function restartSameQuiz() {
+      userAnswers = {};
+      flaggedQuestions.clear();
+      currentQuestionIndex = 0;
+      timeElapsedSeconds = 0;
+      startTimer();
+      renderPalette();
+      loadQuestion(0);
+      switchView('quiz-view');
+    }
+
+    // Đề mẫu tham khảo
+    function insertSampleText() {
+      document.getElementById('raw-text-input').value = `Câu 1: Thủ đô của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam là gì?
+*A. Hà Nội
+B. Thành phố Hồ Chí Minh
+C. Đà Nẵng
+D. Hải Phòng
+Giải thích: Hà Nội là thủ đô của Việt Nam từ năm 1976 sau khi đất nước thống nhất.
+
+Câu 2: Đơn vị cơ bản cấu tạo nên mọi sự sống là gì?
+A. Nguyên tử
+B. Phân tử
+*C. Tế bào
+D. Mô
+Giải thích: Tế bào là đơn vị cơ bản cấu tạo nên mọi sinh vật sống.
+
+Câu 3: Năm 1945 gắn liền với sự kiện lịch sử trọng đại nào của dân tộc Việt Nam?
+*A. Cách mạng Tháng Tám thành công và Bác Hồ đọc Tuyên ngôn Độc lập
+B. Chiến thắng Điện Biên Phủ
+C. Ký kết Hiệp định Giơ-ne-vơ
+D. Giải phóng miền Nam thống nhất đất nước
+Giải thích: Ngày 2/9/1945 tại Quảng trường Ba Đình, Chủ tịch Hồ Chí Minh đọc bản Tuyên ngôn Độc lập khai sinh ra nước Việt Nam Dân chủ Cộng hòa.`;
+    }
   </script>
 </body>
 </html>
