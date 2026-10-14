@@ -76,7 +76,7 @@ Nhiệm vụ:
 
     const accountId = "4df37c88ab53d12373d0125ce2200f93";
     const gatewayId = "quiz-gateway";
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.0-flash-lite";
 
     // Truyền API Key qua header thay vì query param
     const gatewayUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio/v1beta/models/${model}:generateContent`;
