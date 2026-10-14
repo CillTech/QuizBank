@@ -74,35 +74,34 @@ Nhiệm vụ:
       }
     };
 
-    // Định tuyến qua Cloudflare AI Gateway để giải quyết triệt để lỗi User location not supported
     const accountId = "4df37c88ab53d12373d0125ce2200f93";
     const gatewayId = "quiz-gateway";
     const model = "gemini-2.0-flash";
 
-    const gatewayUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // Truyền API Key qua header thay vì query param
+    const gatewayUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio/v1beta/models/${model}:generateContent`;
 
-    let res = await fetch(gatewayUrl, {
+    const res = await fetch(gatewayUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
       body: JSON.stringify(payload)
     });
 
-    let data = await res.json();
-
-    // Tự động thử lại 1 lần nếu máy chủ Google bận
-    if (!res.ok && (res.status === 503 || data.error?.message?.includes("high demand"))) {
-      await new Promise(r => setTimeout(r, 1500));
-      res = await fetch(gatewayUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      data = await res.json();
+    const resText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(resText);
+    } catch {
+      data = { rawText: resText };
     }
 
     if (!res.ok) {
+      const errDetail = data.error?.message || data.message || resText || "Không rõ nguyên nhân";
       return new Response(
-        JSON.stringify({ error: data.error?.message || "Lỗi phản hồi từ Gemini qua Gateway" }),
+        JSON.stringify({ error: `[Status ${res.status}] ${errDetail}` }),
         { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
