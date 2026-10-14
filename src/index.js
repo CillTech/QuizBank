@@ -80,45 +80,33 @@ Nhiệm vụ:
           }
         };
 
-        // Cố định thẳng model gemini-3.8-flash
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+        // Gọi trực tiếp model gemini-3.1-flash-lite
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
 
-        let geminiResponse;
-        let data;
-        let retries = 3; // Thử lại tối đa 3 lần nếu Google bị nghẽn (High Demand)
+        let geminiResponse = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-        while (retries > 0) {
+        let data = await geminiResponse.json();
+
+        // Retry 1 lần nếu gặp lỗi mạng tạm thời
+        if (!geminiResponse.ok && (geminiResponse.status === 503 || data.error?.message?.includes("high demand"))) {
+          await new Promise(r => setTimeout(r, 1500));
           geminiResponse = await fetch(geminiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
           });
-
           data = await geminiResponse.json();
-
-          if (geminiResponse.ok) {
-            break; // Thành công, thoát vòng lặp
-          }
-
-          const errMsg = data.error?.message || "";
-          // Nếu bị quá tải (503 hoặc high demand), đợi 1.5 giây rồi thử lại
-          if (geminiResponse.status === 503 || errMsg.includes("high demand")) {
-            retries--;
-            if (retries > 0) {
-              await new Promise(res => setTimeout(res, 1500));
-              continue;
-            }
-          }
-
-          // Gặp lỗi khác thì dừng ngay
-          break;
         }
 
-        if (!geminiResponse || !geminiResponse.ok) {
+        if (!geminiResponse.ok) {
           return new Response(
-            JSON.stringify({ error: data?.error?.message || "Lỗi kết nối Gemini API" }),
+            JSON.stringify({ error: data?.error?.message || "Lỗi gọi Gemini API" }),
             {
-              status: geminiResponse ? geminiResponse.status : 500,
+              status: geminiResponse.status,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             }
           );
