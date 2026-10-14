@@ -11,12 +11,12 @@ export async function onRequestPost(context) {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trong Environment variables của Pages" }),
+        JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trên Cloudflare Pages" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { text, imageBase64, mimeType, model = "gemini-2.5-flash" } = await request.json();
+    const { text, imageBase64, mimeType } = await request.json();
     if (!text && !imageBase64) {
       return new Response(
         JSON.stringify({ error: "Không tìm thấy nội dung văn bản hoặc hình ảnh" }),
@@ -74,40 +74,57 @@ Nhiệm vụ:
       }
     };
 
-    const cleanModel = model.replace(/^models\//, "");
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`;
+    // Danh sách model ưu tiên dòng flash-lite nhẹ nhất
+    const MODELS = ["gemini-2.0-flash-lite", "gemini-2.0-flash"];
+    let lastError = null;
 
-    let geminiResponse = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    for (const model of MODELS) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    let data = await geminiResponse.json();
+        let geminiResponse = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-    // Thử lại nếu Google bị quá tải
-    if (!geminiResponse.ok && (geminiResponse.status === 503 || data.error?.message?.includes("high demand"))) {
-      await new Promise(r => setTimeout(r, 1500));
-      geminiResponse = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      data = await geminiResponse.json();
+        let data = await geminiResponse.json();
+
+        // Nếu bị quá tải tạm thời, chờ 1.2s rồi thử lại
+        if (!geminiResponse.ok && (geminiResponse.status === 503 || data.error?.message?.includes("high demand"))) {
+          await new Promise(r => setTimeout(r, 1200));
+          geminiResponse = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          data = await geminiResponse.json();
+        }
+
+        if (geminiResponse.ok) {
+          const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          return new Response(rawJson, {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        lastError = data.error?.message;
+        // Nếu lỗi quá tải hoặc not found thì chuyển model tiếp theo
+        if (geminiResponse.status === 503 || geminiResponse.status === 404 || lastError?.includes("high demand")) {
+          continue;
+        } else {
+          break;
+        }
+      } catch (err) {
+        lastError = err.message;
+      }
     }
 
-    if (!geminiResponse.ok) {
-      return new Response(
-        JSON.stringify({ error: `[${cleanModel}] ` + (data?.error?.message || "Lỗi phản hồi từ Gemini API") }),
-        { status: geminiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return new Response(rawJson, {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: lastError || "Không thể kết nối đến máy chủ AI" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
   } catch (err) {
     return new Response(
