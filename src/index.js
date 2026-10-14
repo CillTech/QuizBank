@@ -2,7 +2,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 1. Đón request gọi AI tại /api/process
+    // 1. Đón request gọi AI 
     if (url.pathname === "/api/process" && request.method === "POST") {
       try {
         const apiKey = env.GEMINI_API_KEY;
