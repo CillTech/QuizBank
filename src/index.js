@@ -14,32 +14,12 @@ export default {
 
     const apiKey = env.GEMINI_API_KEY;
 
-    // Route phụ: /api/models dùng để kiểm tra xem tài khoản đang có model nào
-    if (url.pathname === "/api/models" && request.method === "GET") {
-      if (!apiKey) {
-        return new Response(JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      const listData = await listRes.json();
-      return new Response(JSON.stringify(listData), {
-        status: listRes.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Route chính: xử lý câu hỏi và hình ảnh
     if (url.pathname === "/api/process" && request.method === "POST") {
       try {
         if (!apiKey) {
           return new Response(
             JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trên Cloudflare Bindings" }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
@@ -47,13 +27,37 @@ export default {
         if (!text && !imageBase64) {
           return new Response(
             JSON.stringify({ error: "Không tìm thấy nội dung văn bản hoặc hình ảnh" }),
-            {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
+        // BƯỚC 1: Tự động lấy danh sách model thực tế mà API key này được phép dùng
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const listData = await listRes.json();
+
+        if (!listRes.ok) {
+          return new Response(
+            JSON.stringify({ error: "Lỗi kiểm tra Key từ Google: " + (listData.error?.message || "Key không hợp lệ") }),
+            { status: listRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Lọc ra các model có hỗ trợ generateContent
+        const validModels = (listData.models || [])
+          .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
+          .map(m => m.name); // dạng 'models/gemini-xxx'
+
+        if (validModels.length === 0) {
+          return new Response(
+            JSON.stringify({ error: "API Key này hiện không có model nào hỗ trợ generateContent." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Ưu tiên chọn model flash nếu có, nếu không thì lấy model đầu tiên khả dụng
+        const targetModel = validModels.find(m => m.includes("flash")) || validModels[0];
+
+        // BƯỚC 2: Chuẩn bị nội dung gửi đi
         const parts = [{
           text: `Bạn là trợ lý học thuật chuẩn hóa và giải đề thi trắc nghiệm.
 Nhiệm vụ:
@@ -64,10 +68,7 @@ Nhiệm vụ:
 5. Luôn trả về mảng JSON theo đúng schema được chỉ định.`
         }];
 
-        if (text) {
-          parts.push({ text: `Dữ liệu văn bản kèm theo:\n${text}` });
-        }
-
+        if (text) parts.push({ text: `Dữ liệu văn bản kèm theo:\n${text}` });
         if (imageBase64) {
           parts.push({
             inline_data: {
@@ -86,17 +87,10 @@ Nhiệm vụ:
               items: {
                 type: "OBJECT",
                 properties: {
-                  q: { type: "STRING", description: "Nội dung câu hỏi" },
-                  options: {
-                    type: "ARRAY",
-                    items: { type: "STRING" },
-                    description: "Đúng 4 đáp án lựa chọn [A, B, C, D]"
-                  },
-                  answer: {
-                    type: "INTEGER",
-                    description: "Index đáp án đúng: 0 cho A, 1 cho B, 2 cho C, 3 cho D"
-                  },
-                  explain: { type: "STRING", description: "Lời giải thích ngắn gọn" }
+                  q: { type: "STRING" },
+                  options: { type: "ARRAY", items: { type: "STRING" } },
+                  answer: { type: "INTEGER" },
+                  explain: { type: "STRING" }
                 },
                 required: ["q", "options", "answer", "explain"]
               }
@@ -104,52 +98,20 @@ Nhiệm vụ:
           }
         };
 
-        // Danh sách model tương thích
-        const CANDIDATE_MODELS = [
-          "gemini-2.0-flash",
-          "gemini-2.0-flash-exp",
-          "gemini-1.5-flash-latest"
-        ];
+        // BƯỚC 3: Gửi request tới model vừa tìm được tự động
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${apiKey}`;
+        const geminiResponse = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-        let geminiResponse;
-        let data;
+        const data = await geminiResponse.json();
 
-        for (const model of CANDIDATE_MODELS) {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-          geminiResponse = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-
-          data = await geminiResponse.json();
-
-          if (geminiResponse.ok) {
-            break;
-          }
-
-          const errMsg = data.error?.message || "";
-          // Nếu model không tồn tại hoặc nghẽn, thử sang model tiếp theo trong danh sách
-          const canRetryNextModel =
-            geminiResponse.status === 404 ||
-            geminiResponse.status === 503 ||
-            errMsg.includes("not found") ||
-            errMsg.includes("high demand") ||
-            errMsg.includes("no longer available");
-
-          if (!canRetryNextModel) {
-            break;
-          }
-        }
-
-        if (!geminiResponse || !geminiResponse.ok) {
+        if (!geminiResponse.ok) {
           return new Response(
-            JSON.stringify({ error: data?.error?.message || "Không thể kết nối đến Gemini API" }),
-            {
-              status: geminiResponse ? geminiResponse.status : 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
+            JSON.stringify({ error: `Lỗi từ ${targetModel}: ` + (data.error?.message || "Không xử lý được") }),
+            { status: geminiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
@@ -162,10 +124,7 @@ Nhiệm vụ:
       } catch (err) {
         return new Response(
           JSON.stringify({ error: err.message || "Lỗi xử lý nội bộ tại server" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          }
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
