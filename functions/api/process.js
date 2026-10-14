@@ -74,57 +74,40 @@ Nhiệm vụ:
       }
     };
 
-    // Danh sách model ưu tiên dòng flash-lite nhẹ nhất
-    const MODELS = ["gemini-2.0-flash-lite", "gemini-2.0-flash"];
-    let lastError = null;
+    // Cố định duy nhất gemini-3.1-flash-lite
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
 
-    for (const model of MODELS) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    let res = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-        let geminiResponse = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+    let data = await res.json();
 
-        let data = await geminiResponse.json();
-
-        // Nếu bị quá tải tạm thời, chờ 1.2s rồi thử lại
-        if (!geminiResponse.ok && (geminiResponse.status === 503 || data.error?.message?.includes("high demand"))) {
-          await new Promise(r => setTimeout(r, 1200));
-          geminiResponse = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          data = await geminiResponse.json();
-        }
-
-        if (geminiResponse.ok) {
-          const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          return new Response(rawJson, {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-
-        lastError = data.error?.message;
-        // Nếu lỗi quá tải hoặc not found thì chuyển model tiếp theo
-        if (geminiResponse.status === 503 || geminiResponse.status === 404 || lastError?.includes("high demand")) {
-          continue;
-        } else {
-          break;
-        }
-      } catch (err) {
-        lastError = err.message;
-      }
+    // Tự động thử lại 1 lần nếu máy chủ phản hồi quá tải tạm thời
+    if (!res.ok && (res.status === 503 || data.error?.message?.includes("high demand"))) {
+      await new Promise(r => setTimeout(r, 1500));
+      res = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      data = await res.json();
     }
 
-    return new Response(
-      JSON.stringify({ error: lastError || "Không thể kết nối đến máy chủ AI" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    if (!res.ok) {
+      return new Response(
+        JSON.stringify({ error: data.error?.message || "Lỗi phản hồi từ Gemini API" }),
+        { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return new Response(rawJson, {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
 
   } catch (err) {
     return new Response(
