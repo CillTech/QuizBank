@@ -4,7 +4,7 @@ export default {
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
@@ -12,10 +12,9 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    const apiKey = env.GEMINI_API_KEY;
-
     if (url.pathname === "/api/process" && request.method === "POST") {
       try {
+        const apiKey = env.GEMINI_API_KEY;
         if (!apiKey) {
           return new Response(
             JSON.stringify({ error: "Chưa cấu hình GEMINI_API_KEY trên Cloudflare Bindings" }),
@@ -31,44 +30,20 @@ export default {
           );
         }
 
-        // BƯỚC 1: Tự động lấy danh sách model thực tế mà API key này được phép dùng
-        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        const listData = await listRes.json();
-
-        if (!listRes.ok) {
-          return new Response(
-            JSON.stringify({ error: "Lỗi kiểm tra Key từ Google: " + (listData.error?.message || "Key không hợp lệ") }),
-            { status: listRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Lọc ra các model có hỗ trợ generateContent
-        const validModels = (listData.models || [])
-          .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
-          .map(m => m.name); // dạng 'models/gemini-xxx'
-
-        if (validModels.length === 0) {
-          return new Response(
-            JSON.stringify({ error: "API Key này hiện không có model nào hỗ trợ generateContent." }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Ưu tiên chọn model flash nếu có, nếu không thì lấy model đầu tiên khả dụng
-        const targetModel = validModels.find(m => m.includes("flash")) || validModels[0];
-
-        // BƯỚC 2: Chuẩn bị nội dung gửi đi
         const parts = [{
           text: `Bạn là trợ lý học thuật chuẩn hóa và giải đề thi trắc nghiệm.
 Nhiệm vụ:
-1. Đọc kỹ nội dung câu hỏi từ hình ảnh hoặc văn bản được cung cấp.
+1. Đọc kỹ câu hỏi từ hình ảnh hoặc văn bản được cung cấp.
 2. Trích xuất đúng 4 lựa chọn [A, B, C, D] cho mỗi câu.
 3. Nếu đề chưa có đáp án, hãy suy luận chính xác đáp án đúng nhất (0: A, 1: B, 2: C, 3: D).
-4. Viết giải thích ngắn gọn, chuẩn xác cho đáp án đúng.
-5. Luôn trả về mảng JSON theo đúng schema được chỉ định.`
+4. Viết giải thích ngắn gọn, súc tích cho đáp án đúng.
+5. Luôn trả về mảng JSON theo đúng định dạng được chỉ định.`
         }];
 
-        if (text) parts.push({ text: `Dữ liệu văn bản kèm theo:\n${text}` });
+        if (text) {
+          parts.push({ text: `Nội dung văn bản:\n${text}` });
+        }
+
         if (imageBase64) {
           parts.push({
             inline_data: {
@@ -87,10 +62,17 @@ Nhiệm vụ:
               items: {
                 type: "OBJECT",
                 properties: {
-                  q: { type: "STRING" },
-                  options: { type: "ARRAY", items: { type: "STRING" } },
-                  answer: { type: "INTEGER" },
-                  explain: { type: "STRING" }
+                  q: { type: "STRING", description: "Câu hỏi" },
+                  options: {
+                    type: "ARRAY",
+                    items: { type: "STRING" },
+                    description: "Đúng 4 lựa chọn [A, B, C, D]"
+                  },
+                  answer: {
+                    type: "INTEGER",
+                    description: "0 cho A, 1 cho B, 2 cho C, 3 cho D"
+                  },
+                  explain: { type: "STRING", description: "Giải thích đáp án" }
                 },
                 required: ["q", "options", "answer", "explain"]
               }
@@ -98,20 +80,47 @@ Nhiệm vụ:
           }
         };
 
-        // BƯỚC 3: Gửi request tới model vừa tìm được tự động
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${apiKey}`;
-        const geminiResponse = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        // Cố định thẳng model gemini-3.8-flash
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-        const data = await geminiResponse.json();
+        let geminiResponse;
+        let data;
+        let retries = 3; // Thử lại tối đa 3 lần nếu Google bị nghẽn (High Demand)
 
-        if (!geminiResponse.ok) {
+        while (retries > 0) {
+          geminiResponse = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          data = await geminiResponse.json();
+
+          if (geminiResponse.ok) {
+            break; // Thành công, thoát vòng lặp
+          }
+
+          const errMsg = data.error?.message || "";
+          // Nếu bị quá tải (503 hoặc high demand), đợi 1.5 giây rồi thử lại
+          if (geminiResponse.status === 503 || errMsg.includes("high demand")) {
+            retries--;
+            if (retries > 0) {
+              await new Promise(res => setTimeout(res, 1500));
+              continue;
+            }
+          }
+
+          // Gặp lỗi khác thì dừng ngay
+          break;
+        }
+
+        if (!geminiResponse || !geminiResponse.ok) {
           return new Response(
-            JSON.stringify({ error: `Lỗi từ ${targetModel}: ` + (data.error?.message || "Không xử lý được") }),
-            { status: geminiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ error: data?.error?.message || "Lỗi kết nối Gemini API" }),
+            {
+              status: geminiResponse ? geminiResponse.status : 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
           );
         }
 
@@ -123,8 +132,11 @@ Nhiệm vụ:
 
       } catch (err) {
         return new Response(
-          JSON.stringify({ error: err.message || "Lỗi xử lý nội bộ tại server" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: err.message || "Lỗi xử lý nội bộ server" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
         );
       }
     }
