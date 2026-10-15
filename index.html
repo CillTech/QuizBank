@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuizBank - Ôn Thi Trắc Nghiệm Đa Định Dạng</title>
+  <title>QuizBank</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Mammoth.js để đọc file Word (.docx) trực tiếp trên trình duyệt -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -42,7 +42,7 @@
         </div>
         <div>
           <span class="font-extrabold text-xl tracking-tight text-white">Quiz<span class="text-indigo-400">Bank</span></span>
-          <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Auto Parser</span>
+          <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Smart Parser</span>
         </div>
       </div>
       
@@ -120,12 +120,12 @@
         </div>
 
         <div class="relative">
-          <textarea id="raw-text-input" rows="8" class="w-full bg-gray-950/60 border border-gray-800 rounded-xl p-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 font-mono custom-scroll transition-colors" placeholder="Dán nội dung đề thi vào đây... Tự động nhận diện mọi định dạng đề thông dụng."></textarea>
+          <textarea id="raw-text-input" rows="8" class="w-full bg-gray-950/60 border border-gray-800 rounded-xl p-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 font-mono custom-scroll transition-colors" placeholder="Dán nội dung đề thi vào đây... Hỗ trợ mọi định dạng phổ biến."></textarea>
         </div>
 
         <div class="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
           <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i> Hỗ trợ cả <code>*A.</code> và dòng riêng <code>Đáp án: A</code></span>
-          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i> Tự động nhận diện <code>Câu 1:</code>, <code>Q1.</code>, hoặc <code>1.</code></span>
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i> Nhận diện: <code>Câu 1:</code>, <code>Q1.</code>, <code>Câu hỏi: Q1.</code>, hoặc <code>1.</code></span>
         </div>
       </div>
 
@@ -155,14 +155,10 @@
             </div>
 
             <!-- Nội dung đề -->
-            <div id="question-text" class="text-lg sm:text-xl font-semibold text-white leading-relaxed mb-6">
-              <!-- Nội dung câu hỏi -->
-            </div>
+            <div id="question-text" class="text-lg sm:text-xl font-semibold text-white leading-relaxed mb-6"></div>
 
             <!-- Danh sách lựa chọn -->
-            <div id="options-container" class="space-y-3">
-              <!-- Render động -->
-            </div>
+            <div id="options-container" class="space-y-3"></div>
           </div>
 
           <!-- Điều hướng Trước / Sau -->
@@ -190,9 +186,7 @@
             <div id="progress-bar" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
           </div>
 
-          <div id="palette-grid" class="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto custom-scroll pr-1">
-            <!-- Nút câu hỏi tạo động -->
-          </div>
+          <div id="palette-grid" class="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto custom-scroll pr-1"></div>
 
           <div class="mt-5 pt-4 border-t border-gray-800 text-[11px] text-gray-400 space-y-1.5">
             <div class="flex items-center"><span class="w-3 h-3 rounded bg-indigo-600 mr-2"></span> Đang xem</div>
@@ -249,9 +243,7 @@
           <i class="fa-solid fa-list-check text-indigo-400 mr-2.5"></i>
           Chi tiết bài thi & Đáp án
         </h3>
-        <div id="review-list" class="space-y-4">
-          <!-- Chi tiết từng câu hiển thị động -->
-        </div>
+        <div id="review-list" class="space-y-4"></div>
       </div>
 
     </div>
@@ -385,24 +377,24 @@
       }
     }
 
-    // ================= PARSER ĐA ĐỊNH DẠNG (ROBUST MULTI-FORMAT PARSER) =================
+    // ================= PARSER ĐA ĐỊNH DẠNG =================
     function parseQuizText(rawText) {
       const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       const parsedQuestions = [];
 
-      // Nhận dạng bắt đầu câu hỏi:
-      // "Câu 1:", "Câu hỏi 1.", "Q1.", "Question 1:", "[Câu 1]", "1.", "1/", "1)"
-      const qStartRegex = /^(?:(?:câu\s*hỏi|câu|question|q|bài)\s*[\d\.\:\)\-\/]+|\[\s*(?:câu\vert{}q)?\s*\d+\s*\]|\d+[\.\)\:\/])\s*(.*)/i;
+      // Nhận diện câu hỏi:
+      // "Câu hỏi: Q1. ...", "Câu 1: ...", "Q1. ...", "Question 1: ...", "[Câu 1] ...", "1. ..."
+      const qStartRegex = /^(?:(?:câu\s*hỏi|câu|question|bài)\s*[:\.\-]?\s*)?(?:q\s*[\d]+|\[\s*(?:câu\vert{}q)?\s*\d+\s*\]|\d+)[\.\)\:\/\-]\s*(.*)/i;
 
-      // Nhận dạng lựa chọn đáp án:
+      // Nhận diện lựa chọn:
       // "*A.", "A.", "A)", "[A]", "(A)", "*A)", "A -", "A:"
       const optRegex = /^(\*?)\s*(?:[\(\[\{]?([A-H])[\)\]\}]?[\.\:\-\)]?)\s*(\*?)\s*(.*)/i;
 
-      // Nhận dạng dòng đáp án độc lập:
+      // Nhận diện dòng đáp án độc lập:
       // "Đáp án: A", "Đáp án đúng: C", "Answer: B", "Key: D", "Đ/A: A"
       const ansExplicitRegex = /^(?:đáp\s*án(?:\s*đúng)?|câu\s*trả\s*lời|answer|key|đ\/a|da)\s*[\:\-\=]\s*([A-H])/i;
 
-      // Nhận dạng dòng giải thích:
+      // Nhận diện lời giải / giải thích:
       // "Giải thích:", "Lời giải:", "Explain:", "Hướng dẫn giải:"
       const expRegex = /^(?:giải\s*thích|lời\s*giải|hướng\s*dẫn(?:\s*giải)?|explain(?:ation)?)\s*[\:\-]\s*(.*)/i;
 
@@ -411,7 +403,6 @@
       function commitCurrentQuestion() {
         if (!currentQ) return;
         if (currentQ.q.trim().length > 0 && currentQ.options.length >= 2) {
-          // Nếu có dòng explicit answer (ví dụ: Đáp án: C)
           if (currentQ.explicitAnswerLetter) {
             const letterIdx = currentQ.explicitAnswerLetter.charCodeAt(0) - 65;
             if (letterIdx >= 0 && letterIdx < currentQ.options.length) {
@@ -440,7 +431,7 @@
           continue;
         }
 
-        // 2. Kiểm tra dòng đáp án riêng lẻ (ví dụ: "Đáp án: A")
+        // 2. Kiểm tra dòng đáp án riêng lẻ
         if (currentQ && ansExplicitRegex.test(line)) {
           const match = line.match(ansExplicitRegex);
           currentQ.explicitAnswerLetter = match[1].toUpperCase();
@@ -449,18 +440,13 @@
 
         // 3. Kiểm tra lựa chọn đáp án (A, B, C, D, ...)
         const optMatch = line.match(optRegex);
-        // Chỉ nhận là lựa chọn nếu đã có câu hỏi hoặc ký tự phù hợp (thường xuất hiện từ A)
         if (currentQ && optMatch && !currentQ.inExplain) {
           const isMarkedPrefix = optMatch[1] === '*' || optMatch[3] === '*';
-          const letter = optMatch[2].toUpperCase();
           let optText = optMatch[4].trim();
 
-          // Kiểm tra xem cuối dòng có dấu * hoặc chú thích "(đáp án)" không
           const isMarkedSuffix = /\*$/.test(optText) || /\((?:đáp\s*án(?:\s*đúng)?\vert{}correct)\)$/i.test(optText);
           optText = optText.replace(/\*+$/g, '').replace(/\((?:đáp\s*án(?:\s*đúng)?\vert{}correct)\)$/i, '').trim();
 
-          const optIdx = letter.charCodeAt(0) - 65; // A=0, B=1, ...
-          
           currentQ.options.push(optText);
           const currentOptionIndex = currentQ.options.length - 1;
 
@@ -476,7 +462,7 @@
 
           const match = line.match(qStartRegex);
           currentQ = {
-            q: (match[1] || line).trim(),
+            q: (match[1] && match[1].trim().length > 0) ? match[1].trim() : line,
             options: [],
             answer: 0,
             explicitAnswerLetter: null,
@@ -486,14 +472,13 @@
           continue;
         }
 
-        // 5. Nối chuỗi dòng tiếp theo (Multiline question / explanation)
+        // 5. Nối chuỗi dòng tiếp theo nếu nội dung trải dài nhiều dòng
         if (currentQ) {
           if (currentQ.inExplain) {
             currentQ.explain += ' ' + line;
           } else if (currentQ.options.length === 0) {
             currentQ.q += ' ' + line;
           } else {
-            // Nối dài nội dung lựa chọn vừa thêm nếu bị xuống dòng
             currentQ.options[currentQ.options.length - 1] += ' ' + line;
           }
         }
@@ -536,7 +521,7 @@
       }
 
       if (extractedQuestions.length === 0) {
-        alert("Không nhận diện được câu hỏi trắc nghiệm nào! Hệ thống hỗ trợ đa dạng định dạng:\n\n- Có dấu hoa thị: *A. Đáp án hoặc A. Đáp án *\n- Có dòng riêng: Đáp án: A\n- Tiền tố linh hoạt: Câu 1, Q1, 1., ...");
+        alert("Không nhận diện được câu hỏi trắc nghiệm nào! Vui lòng kiểm tra lại nội dung đầu vào.");
         return;
       }
 
@@ -780,7 +765,6 @@
       switchView('quiz-view');
     }
 
-    // Mẫu 1: Dấu sao trực tiếp
     function insertSampleFormat1() {
       document.getElementById('raw-text-input').value = `Câu 1: Thủ đô của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam là gì?
 *A. Hà Nội
@@ -797,7 +781,6 @@ D. Mô
 Giải thích: Tế bào là đơn vị cơ bản cấu tạo nên mọi sự sống.`;
     }
 
-    // Mẫu 2: Dòng "Đáp án: A" riêng biệt
     function insertSampleFormat2() {
       document.getElementById('raw-text-input').value = `Câu hỏi: Q1. In what year was the UNIX operating system originally developed?
 A. 1973
