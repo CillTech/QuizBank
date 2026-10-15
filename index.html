@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuizBank - Ôn Thi Trắc Nghiệm</title>
+  <title>QuizBank - Ôn Thi Trắc Nghiệm Đa Định Dạng</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Mammoth.js để đọc file Word (.docx) trực tiếp trên trình duyệt -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -42,7 +42,7 @@
         </div>
         <div>
           <span class="font-extrabold text-xl tracking-tight text-white">Quiz<span class="text-indigo-400">Bank</span></span>
-          <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Offline Core</span>
+          <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Auto Parser</span>
         </div>
       </div>
       
@@ -68,7 +68,7 @@
           Ngân Hàng Đề Thi Trắc Nghiệm
         </h1>
         <p class="text-gray-400 max-w-xl mx-auto text-sm sm:text-base">
-          Tải lên nhiều tệp tin hoặc dán nội dung văn bản để hệ thống tự động bóc tách câu hỏi và tạo phòng thi trắc nghiệm ngay lập tức.
+          Tương thích tự động với nhiều dạng đề thi: có dòng "Đáp án: A", dấu sao trước/sau đáp án (*A. hoặc A.*), hoặc file Word (.docx).
         </p>
       </div>
 
@@ -88,7 +88,7 @@
             <i class="fa-solid fa-cloud-arrow-up"></i>
           </div>
           <p class="text-white font-medium text-base mb-1">Kéo & thả nhiều tệp vào đây, hoặc <span class="text-indigo-400 underline underline-offset-2">chọn từ thiết bị</span></p>
-          <p class="text-xs text-gray-500">Hỗ trợ cùng lúc nhiều file Word (.docx), tệp văn bản (.txt) hoặc JSON ngân hàng đề</p>
+          <p class="text-xs text-gray-500">Hỗ trợ file Word (.docx), file text (.txt), file đề xuất khẩu hoặc JSON</p>
         </div>
 
         <!-- Danh sách file đã chọn -->
@@ -108,25 +108,24 @@
             <i class="fa-solid fa-paste text-indigo-400 mr-2.5"></i>
             Hoặc dán trực tiếp nội dung đề thi
           </h2>
-          <button onclick="insertSampleText()" class="text-xs text-indigo-400 hover:underline">
-            Chèn đề mẫu
-          </button>
+          <div class="space-x-2">
+            <button onclick="insertSampleFormat1()" class="text-xs text-indigo-400 hover:underline">
+              Mẫu: Dấu sao (*A.)
+            </button>
+            <span class="text-gray-600">|</span>
+            <button onclick="insertSampleFormat2()" class="text-xs text-indigo-400 hover:underline">
+              Mẫu: Dòng "Đáp án: A"
+            </button>
+          </div>
         </div>
 
         <div class="relative">
-          <textarea id="raw-text-input" rows="8" class="w-full bg-gray-950/60 border border-gray-800 rounded-xl p-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 font-mono custom-scroll transition-colors" placeholder="Câu 1: Thủ đô của Việt Nam là gì?
-*A. Hà Nội
-B. TP. Hồ Chí Minh
-C. Đà Nẵng
-D. Cần Thơ
-Giải thích: Hà Nội là thủ đô của nước CHXHCN Việt Nam.
-
-Câu 2: ..."></textarea>
+          <textarea id="raw-text-input" rows="8" class="w-full bg-gray-950/60 border border-gray-800 rounded-xl p-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 font-mono custom-scroll transition-colors" placeholder="Dán nội dung đề thi vào đây... Tự động nhận diện mọi định dạng đề thông dụng."></textarea>
         </div>
 
         <div class="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
-          <span><i class="fa-solid fa-circle-info mr-1 text-gray-400"></i> Mẹo: Thêm dấu <b>*</b> trước đáp án đúng (ví dụ: <code>*A. Hà Nội</code>)</span>
-          <span>Thêm dòng <code>Giải thích: ...</code> để tạo phần hướng dẫn giải</span>
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i> Hỗ trợ cả <code>*A.</code> và dòng riêng <code>Đáp án: A</code></span>
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i> Tự động nhận diện <code>Câu 1:</code>, <code>Q1.</code>, hoặc <code>1.</code></span>
         </div>
       </div>
 
@@ -162,7 +161,7 @@ Câu 2: ..."></textarea>
 
             <!-- Danh sách lựa chọn -->
             <div id="options-container" class="space-y-3">
-              <!-- Các lựa chọn A, B, C, D render động -->
+              <!-- Render động -->
             </div>
           </div>
 
@@ -264,9 +263,8 @@ Câu 2: ..."></textarea>
     QuizBank Engine &bull; Hoạt động ngoại tuyến &bull; Trích xuất dữ liệu không cần máy chủ
   </footer>
 
-  <!-- ================= LOGIC JAVASCRIPT THUẦN ================= -->
+  <!-- ================= LOGIC JAVASCRIPT ================= -->
   <script>
-    // Trạng thái ứng dụng
     let quizBank = [];
     let userAnswers = {};
     let flaggedQuestions = new Set();
@@ -275,7 +273,6 @@ Câu 2: ..."></textarea>
     let timeElapsedSeconds = 0;
     let selectedFiles = [];
 
-    // Chuyển đổi màn hình
     function switchView(viewId) {
       document.getElementById('import-view').classList.add('hidden');
       document.getElementById('quiz-view').classList.add('hidden');
@@ -291,7 +288,7 @@ Câu 2: ..."></textarea>
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ================= XỬ LÝ UPLOAD FILE HÀNG LOẠT =================
+    // ================= XỬ LÝ UPLOAD FILE =================
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
 
@@ -322,7 +319,6 @@ Câu 2: ..."></textarea>
 
     function addFiles(files) {
       for (let f of files) {
-        // Tránh trùng tên
         if (!selectedFiles.some(item => item.name === f.name && item.size === f.size)) {
           selectedFiles.push(f);
         }
@@ -378,7 +374,6 @@ Câu 2: ..."></textarea>
       });
     }
 
-    // Đọc nội dung của 1 file cụ thể
     async function readFileContent(file) {
       const name = file.name.toLowerCase();
       if (name.endsWith('.docx')) {
@@ -390,94 +385,122 @@ Câu 2: ..."></textarea>
       }
     }
 
-    // ================= PARSER REGEX THUẦN (CLIENT-SIDE) =================
+    // ================= PARSER ĐA ĐỊNH DẠNG (ROBUST MULTI-FORMAT PARSER) =================
     function parseQuizText(rawText) {
-      const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-      const questions = [];
-      let current = null;
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const parsedQuestions = [];
 
-      // Nhận diện: Câu 1:, Câu 1., 1., 1/, Question 1:
-      const qStartRegex = /^(?:câu|question|\d+)\s*[\d\.\:\)\-\/]+/i;
-      // Nhận diện: A., A), [A], *A., A.*,...
-      const optRegex = /^(\*?)\s*\(?([A-D])[\.\)]\s*(.*)/i;
-      // Nhận diện giải thích: Giải thích: / Explain:
-      const explainRegex = /^(?:giải\s*thích|lời\s*giải|explain)\s*[\:\-]\s*(.*)/i;
+      // Nhận dạng bắt đầu câu hỏi:
+      // "Câu 1:", "Câu hỏi 1.", "Q1.", "Question 1:", "[Câu 1]", "1.", "1/", "1)"
+      const qStartRegex = /^(?:(?:câu\s*hỏi|câu|question|q|bài)\s*[\d\.\:\)\-\/]+|\[\s*(?:câu\vert{}q)?\s*\d+\s*\]|\d+[\.\)\:\/])\s*(.*)/i;
+
+      // Nhận dạng lựa chọn đáp án:
+      // "*A.", "A.", "A)", "[A]", "(A)", "*A)", "A -", "A:"
+      const optRegex = /^(\*?)\s*(?:[\(\[\{]?([A-H])[\)\]\}]?[\.\:\-\)]?)\s*(\*?)\s*(.*)/i;
+
+      // Nhận dạng dòng đáp án độc lập:
+      // "Đáp án: A", "Đáp án đúng: C", "Answer: B", "Key: D", "Đ/A: A"
+      const ansExplicitRegex = /^(?:đáp\s*án(?:\s*đúng)?|câu\s*trả\s*lời|answer|key|đ\/a|da)\s*[\:\-\=]\s*([A-H])/i;
+
+      // Nhận dạng dòng giải thích:
+      // "Giải thích:", "Lời giải:", "Explain:", "Hướng dẫn giải:"
+      const expRegex = /^(?:giải\s*thích|lời\s*giải|hướng\s*dẫn(?:\s*giải)?|explain(?:ation)?)\s*[\:\-]\s*(.*)/i;
+
+      let currentQ = null;
+
+      function commitCurrentQuestion() {
+        if (!currentQ) return;
+        if (currentQ.q.trim().length > 0 && currentQ.options.length >= 2) {
+          // Nếu có dòng explicit answer (ví dụ: Đáp án: C)
+          if (currentQ.explicitAnswerLetter) {
+            const letterIdx = currentQ.explicitAnswerLetter.charCodeAt(0) - 65;
+            if (letterIdx >= 0 && letterIdx < currentQ.options.length) {
+              currentQ.answer = letterIdx;
+            }
+          }
+
+          parsedQuestions.push({
+            q: currentQ.q.trim(),
+            options: currentQ.options,
+            answer: (typeof currentQ.answer === 'number' && currentQ.answer >= 0 && currentQ.answer < currentQ.options.length) ? currentQ.answer : 0,
+            explain: currentQ.explain.trim() || "Chưa có lời giải chi tiết cho câu hỏi này."
+          });
+        }
+        currentQ = null;
+      }
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
-        // 1. Kiểm tra nếu là giải thích
-        if (current && explainRegex.test(line)) {
-          const match = line.match(explainRegex);
-          current.explain = match[1] || "";
+        // 1. Kiểm tra dòng giải thích
+        if (currentQ && expRegex.test(line)) {
+          const match = line.match(expRegex);
+          currentQ.explain = match[1] || "";
+          currentQ.inExplain = true;
           continue;
         }
 
-        // 2. Kiểm tra nếu là bắt đầu một lựa chọn đáp án
+        // 2. Kiểm tra dòng đáp án riêng lẻ (ví dụ: "Đáp án: A")
+        if (currentQ && ansExplicitRegex.test(line)) {
+          const match = line.match(ansExplicitRegex);
+          currentQ.explicitAnswerLetter = match[1].toUpperCase();
+          continue;
+        }
+
+        // 3. Kiểm tra lựa chọn đáp án (A, B, C, D, ...)
         const optMatch = line.match(optRegex);
-        if (optMatch && current) {
-          const isMarked = optMatch[1] === '*' || line.includes('*') || line.toLowerCase().includes('(đáp án)');
+        // Chỉ nhận là lựa chọn nếu đã có câu hỏi hoặc ký tự phù hợp (thường xuất hiện từ A)
+        if (currentQ && optMatch && !currentQ.inExplain) {
+          const isMarkedPrefix = optMatch[1] === '*' || optMatch[3] === '*';
           const letter = optMatch[2].toUpperCase();
-          const optionText = optMatch[3].replace(/\*+/g, '').replace(/\(đáp án\)/ig, '').trim();
-          const optIdx = letter.charCodeAt(0) - 65; // A:0, B:1, C:2, D:3
+          let optText = optMatch[4].trim();
 
-          if (optIdx >= 0 && optIdx < 4) {
-            current.options[optIdx] = optionText;
-            if (isMarked) {
-              current.answer = optIdx;
-            }
+          // Kiểm tra xem cuối dòng có dấu * hoặc chú thích "(đáp án)" không
+          const isMarkedSuffix = /\*$/.test(optText) || /\((?:đáp\s*án(?:\s*đúng)?\vert{}correct)\)$/i.test(optText);
+          optText = optText.replace(/\*+$/g, '').replace(/\((?:đáp\s*án(?:\s*đúng)?\vert{}correct)\)$/i, '').trim();
+
+          const optIdx = letter.charCodeAt(0) - 65; // A=0, B=1, ...
+          
+          currentQ.options.push(optText);
+          const currentOptionIndex = currentQ.options.length - 1;
+
+          if (isMarkedPrefix || isMarkedSuffix) {
+            currentQ.answer = currentOptionIndex;
           }
           continue;
         }
 
-        // 3. Kiểm tra nếu là bắt đầu một câu hỏi mới
+        // 4. Kiểm tra bắt đầu câu hỏi mới
         if (qStartRegex.test(line)) {
-          if (current && isValidQuestion(current)) {
-            questions.push(finalizeQuestion(current));
-          }
-          current = {
-            q: line.replace(qStartRegex, '').trim(),
+          commitCurrentQuestion();
+
+          const match = line.match(qStartRegex);
+          currentQ = {
+            q: (match[1] || line).trim(),
             options: [],
             answer: 0,
-            explain: ""
+            explicitAnswerLetter: null,
+            explain: "",
+            inExplain: false
           };
           continue;
         }
 
-        // 4. Các dòng tiếp nối câu hỏi hoặc giải thích
-        if (current) {
-          if (current.options.length === 0) {
-            current.q += ' ' + line;
-          } else if (current.explain) {
-            current.explain += ' ' + line;
+        // 5. Nối chuỗi dòng tiếp theo (Multiline question / explanation)
+        if (currentQ) {
+          if (currentQ.inExplain) {
+            currentQ.explain += ' ' + line;
+          } else if (currentQ.options.length === 0) {
+            currentQ.q += ' ' + line;
+          } else {
+            // Nối dài nội dung lựa chọn vừa thêm nếu bị xuống dòng
+            currentQ.options[currentQ.options.length - 1] += ' ' + line;
           }
         }
       }
 
-      // Đẩy câu hỏi cuối cùng
-      if (current && isValidQuestion(current)) {
-        questions.push(finalizeQuestion(current));
-      }
-
-      return questions;
-    }
-
-    function isValidQuestion(q) {
-      return q.q.trim().length > 0 && q.options.filter(Boolean).length >= 2;
-    }
-
-    function finalizeQuestion(q) {
-      return {
-        q: q.q.trim(),
-        options: [
-          q.options[0] || "Lựa chọn A",
-          q.options[1] || "Lựa chọn B",
-          q.options[2] || "Lựa chọn C",
-          q.options[3] || "Lựa chọn D"
-        ],
-        answer: (typeof q.answer === 'number' && q.answer >= 0 && q.answer < 4) ? q.answer : 0,
-        explain: q.explain ? q.explain.trim() : "Chưa có lời giải chi tiết cho câu hỏi này."
-      };
+      commitCurrentQuestion();
+      return parsedQuestions;
     }
 
     // ================= XỬ LÝ DỮ LIỆU ĐẦU VÀO =================
@@ -485,7 +508,6 @@ Câu 2: ..."></textarea>
       let combinedText = document.getElementById('raw-text-input').value.trim();
       let extractedQuestions = [];
 
-      // 1. Đọc và gộp toàn bộ file tải lên
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
           try {
@@ -508,18 +530,16 @@ Câu 2: ..."></textarea>
         }
       }
 
-      // 2. Parser dữ liệu text
       if (combinedText.trim()) {
         const textParsed = parseQuizText(combinedText);
         extractedQuestions.push(...textParsed);
       }
 
       if (extractedQuestions.length === 0) {
-        alert("Không nhận diện được câu hỏi trắc nghiệm nào! Vui lòng tải file hoặc nhập đúng định dạng:\n\nCâu 1: ...\n*A. ...\nB. ...\nC. ...\nD. ...");
+        alert("Không nhận diện được câu hỏi trắc nghiệm nào! Hệ thống hỗ trợ đa dạng định dạng:\n\n- Có dấu hoa thị: *A. Đáp án hoặc A. Đáp án *\n- Có dòng riêng: Đáp án: A\n- Tiền tố linh hoạt: Câu 1, Q1, 1., ...");
         return;
       }
 
-      // Nạp ngân hàng câu hỏi và bắt đầu
       quizBank = extractedQuestions;
       userAnswers = {};
       flaggedQuestions.clear();
@@ -553,7 +573,6 @@ Câu 2: ..."></textarea>
       document.getElementById('total-q-num').textContent = quizBank.length;
       document.getElementById('question-text').textContent = qData.q;
 
-      // Nút cờ đánh dấu
       const flagBtn = document.getElementById('flag-btn');
       if (flaggedQuestions.has(index)) {
         flagBtn.innerHTML = '<i class="fa-solid fa-bookmark mr-1.5 text-sm text-amber-400"></i> <span class="text-amber-400">Đã đánh dấu</span>';
@@ -561,12 +580,11 @@ Câu 2: ..."></textarea>
         flagBtn.innerHTML = '<i class="fa-regular fa-bookmark mr-1.5 text-sm"></i> Đánh dấu xem lại';
       }
 
-      // Render options
       const optContainer = document.getElementById('options-container');
       optContainer.innerHTML = '';
-      const letters = ['A', 'B', 'C', 'D'];
 
       qData.options.forEach((optText, optIdx) => {
+        const letter = String.fromCharCode(65 + optIdx);
         const isSelected = userAnswers[index] === optIdx;
         const btn = document.createElement('button');
         btn.onclick = () => selectOption(index, optIdx);
@@ -580,14 +598,13 @@ Câu 2: ..."></textarea>
           <span class="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-xs font-bold ${
             isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
           }">
-            ${letters[optIdx]}
+            ${letter}
           </span>
           <span class="text-sm sm:text-base leading-relaxed pt-0.5">${optText}</span>
         `;
         optContainer.appendChild(btn);
       });
 
-      // Cập nhật nút Trước / Sau
       document.getElementById('prev-btn').disabled = (index === 0);
       document.getElementById('next-btn').disabled = (index === quizBank.length - 1);
 
@@ -662,7 +679,7 @@ Câu 2: ..."></textarea>
       const unanswered = quizBank.length - Object.keys(userAnswers).length;
       let msg = "Bạn có chắc chắn muốn nộp bài?";
       if (unanswered > 0) {
-        msg = `Bạn còn ${unanswered} câu chưa trả lời. Bạn vẫn muốn nộp bài chứ?`;
+        msg = `Bạn còn ${unanswered} câu chưa hoàn thành. Bạn có muốn nộp ngay không?`;
       }
       if (confirm(msg)) {
         finishQuiz();
@@ -697,7 +714,6 @@ Câu 2: ..."></textarea>
     function renderReview() {
       const container = document.getElementById('review-list');
       container.innerHTML = '';
-      const letters = ['A', 'B', 'C', 'D'];
 
       quizBank.forEach((q, idx) => {
         const userChoice = userAnswers[idx];
@@ -709,6 +725,7 @@ Câu 2: ..."></textarea>
 
         let optionsHtml = '';
         q.options.forEach((optText, optIdx) => {
+          const letter = String.fromCharCode(65 + optIdx);
           let optStyle = 'border-gray-800 text-gray-400 bg-gray-950/30';
           let tag = '';
 
@@ -723,7 +740,7 @@ Câu 2: ..."></textarea>
 
           optionsHtml += `
             <div class="flex items-center px-4 py-2.5 rounded-xl border text-sm ${optStyle}">
-              <span class="w-6 font-bold">${letters[optIdx]}.</span>
+              <span class="w-6 font-bold">${letter}.</span>
               <span>${optText}</span>
               ${tag}
             </div>
@@ -763,28 +780,40 @@ Câu 2: ..."></textarea>
       switchView('quiz-view');
     }
 
-    // Đề mẫu tham khảo
-    function insertSampleText() {
+    // Mẫu 1: Dấu sao trực tiếp
+    function insertSampleFormat1() {
       document.getElementById('raw-text-input').value = `Câu 1: Thủ đô của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam là gì?
 *A. Hà Nội
 B. Thành phố Hồ Chí Minh
 C. Đà Nẵng
 D. Hải Phòng
-Giải thích: Hà Nội là thủ đô của Việt Nam từ năm 1976 sau khi đất nước thống nhất.
+Giải thích: Hà Nội là thủ đô của Việt Nam từ năm 1976.
 
-Câu 2: Đơn vị cơ bản cấu tạo nên mọi sự sống là gì?
+Câu 2: Đơn vị cơ bản cấu tạo nên mọi sinh vật sống là gì?
 A. Nguyên tử
 B. Phân tử
 *C. Tế bào
 D. Mô
-Giải thích: Tế bào là đơn vị cơ bản cấu tạo nên mọi sinh vật sống.
+Giải thích: Tế bào là đơn vị cơ bản cấu tạo nên mọi sự sống.`;
+    }
 
-Câu 3: Năm 1945 gắn liền với sự kiện lịch sử trọng đại nào của dân tộc Việt Nam?
-*A. Cách mạng Tháng Tám thành công và Bác Hồ đọc Tuyên ngôn Độc lập
-B. Chiến thắng Điện Biên Phủ
-C. Ký kết Hiệp định Giơ-ne-vơ
-D. Giải phóng miền Nam thống nhất đất nước
-Giải thích: Ngày 2/9/1945 tại Quảng trường Ba Đình, Chủ tịch Hồ Chí Minh đọc bản Tuyên ngôn Độc lập khai sinh ra nước Việt Nam Dân chủ Cộng hòa.`;
+    // Mẫu 2: Dòng "Đáp án: A" riêng biệt
+    function insertSampleFormat2() {
+      document.getElementById('raw-text-input').value = `Câu hỏi: Q1. In what year was the UNIX operating system originally developed?
+A. 1973
+B. 1984
+C. 1969
+D. 1991
+Đáp án: C
+Giải thích: Phiên bản đầu tiên của UNIX được phát triển vào năm 1969 tại Bell Labs.
+
+Câu hỏi: Q2. Which programming language was used to rewrite UNIX in 1973?
+A. The C language
+B. Bourne shell scripts
+C. Pascal language
+D. Assembly
+Đáp án: A
+Giải thích: UNIX được viết lại bằng ngôn ngữ C vào năm 1973 để tăng tính di động.`;
     }
   </script>
 </body>
